@@ -1,0 +1,160 @@
+<title>Gridlock Driving Sim</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Overpass:wght@400;600;800&family=Overpass+Mono:wght@500;700&display=swap">
+<style>/*CSS*/</style>
+<div id="app">
+  <canvas id="view" aria-label="3D city driving view"></canvas>
+  <canvas id="glass" aria-hidden="true"></canvas>
+  <div id="flash" aria-hidden="true"></div>
+  <div id="bubbles" aria-live="off"></div>
+  <div id="debugLayer" hidden></div>
+
+  <div id="hud">
+    <div class="hud-top">
+      <section class="panel road" aria-label="Road">
+        <div id="limitSign" class="limit-sign"><span class="limit-top">SPEED<br>LIMIT</span><span id="limitValue">40</span><span id="limitUnit">km/h</span></div>
+        <div class="road-text">
+          <div class="panel-label">Now on</div>
+          <div id="roadName" class="road-name">—</div>
+          <div id="nextJunction" class="next" hidden>
+            <div class="mini-head" id="njSignal">
+              <i id="lr"></i><i id="ly"></i><i id="lg"></i>
+              <b id="larrow" hidden data-lamp="off">◀</b>
+            </div>
+            <div id="njSign" class="mini-sign stop" hidden></div>
+            <div class="next-text">
+              <div><span id="njKind">Signal</span> · <span id="njDist" class="mono">0 m</span> <span id="njCam" class="cam-badge" hidden>Camera</span></div>
+              <div id="njName" class="next-name"></div>
+              <div id="ped" class="ped" data-state="dont"><span id="pedCount" class="mono"></span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <div id="toasts" aria-live="polite"></div>
+      <section class="panel status" aria-label="Status">
+        <div class="status-row"><span id="clock" class="mono big">20:45</span><span id="weather">Clear</span></div>
+        <div class="status-row"><span class="panel-label">Wallet</span><span id="wallet" class="mono">€$5,000</span></div>
+        <div class="status-row"><span class="panel-label">License points</span><span id="points" class="mono">0/12</span></div>
+        <div class="status-row"><span class="panel-label">Heat</span><span id="heat" class="heat"><i></i><i></i><i></i><i></i><i></i></span></div>
+        <div id="policeState" class="police-state" hidden></div>
+        <button id="menuBtn" class="menu-btn" type="button">Menu · Esc</button>
+      </section>
+    </div>
+    <div id="banner" class="banner" hidden data-kind="warn"></div>
+    <section id="moods" class="panel moods" hidden aria-label="Angry drivers"></section>
+    <div class="hud-bottom">
+      <div id="mapWrap" class="map-wrap"><canvas id="minimap"></canvas></div>
+      <div class="hint">F1 controls · V camera · Q/E indicators · H horn · G wave sorry</div>
+      <section class="cluster-wrap" aria-label="Instruments">
+        <div class="indicators"><b id="indL" class="ind">◀</b><b id="indR" class="ind">▶</b></div>
+        <canvas id="cluster"></canvas>
+        <div class="telltales">
+          <span id="ttLow" class="tt g">LOW</span><span id="ttHigh" class="tt b">HIGH</span><span id="ttHaz" class="tt r">HAZARD</span>
+          <span id="ttBrake" class="tt r">PARK</span><span id="ttBelt" class="tt r">BELT</span><span id="ttEng" class="tt a">ENGINE</span>
+          <span id="ttFuel" class="tt a">FUEL</span><span id="ttAbs" class="tt a">ABS</span><span id="ttTcs" class="tt a">TCS</span>
+          <span id="ttEsc" class="tt a">ESC</span><span id="ttCruise" class="tt g">CRUISE</span><span id="ttLim" class="tt g">LIM</span><span id="ttWipe" class="tt g">WIPE</span>
+        </div>
+        <div class="bars">
+          <span class="panel-label">Fuel</span><div class="bar"><i id="fuelBar"></i></div>
+          <span class="panel-label">Health</span><div class="bar dmg"><i id="dmgBar"></i></div>
+        </div>
+        <div class="cluster-foot"><span id="lightSwitch">LIGHTS AUTO</span><span id="transMode">AUTO</span></div>
+      </section>
+    </div>
+    <div id="fps" class="fps"></div>
+  </div>
+
+  <div id="touch" class="touch" hidden>
+    <div class="touch-left">
+      <button type="button" data-hold="steer_left" aria-label="Steer left">◀</button>
+      <button type="button" data-hold="steer_right" aria-label="Steer right">▶</button>
+    </div>
+    <div class="touch-mid">
+      <button type="button" data-press="indicator_left">◁ Sig</button>
+      <button type="button" data-press="hazards">Hazard</button>
+      <button type="button" data-press="indicator_right">Sig ▷</button>
+      <button type="button" data-hold="horn">Horn</button>
+      <button type="button" data-press="headlights">Lights</button>
+      <button type="button" data-hold="flash">Flash</button>
+      <button type="button" data-press="apologize">Wave</button>
+      <button type="button" data-press="camera">Cam</button>
+      <button type="button" data-press="pause">Menu</button>
+    </div>
+    <div class="touch-right">
+      <button type="button" data-hold="handbrake" class="hb">HB</button>
+      <button type="button" data-hold="brake" class="pedal brake">Brake</button>
+      <button type="button" data-hold="throttle" class="pedal gas">Gas</button>
+    </div>
+  </div>
+
+  <div id="title" class="title">
+    <div class="title-inner">
+      <p class="eyebrow">Traffic &amp; driving simulation</p>
+      <h1>Gridlock</h1>
+      <p class="lede">A city that drives itself. 110 drivers with their own temper, real signal phasing, police who notice, and a car with every button. Obey the lights, or don't.</p>
+      <ul class="facts">
+        <li><b>23</b> signalised junctions with protected lefts, pedestrian heads and cameras</li>
+        <li><b>8</b> driver personalities that honk, flash, tailgate, brake-check and ram</li>
+        <li><b>41</b> controls: indicators, hazards, wipers, cruise, clutch, ignition, seatbelt…</li>
+      </ul>
+      <div class="title-actions">
+        <button id="startBtn" class="primary" type="button">Start driving</button>
+        <button id="controlsBtn" type="button">See all controls</button>
+      </div>
+      <p class="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive · <kbd>Q</kbd>/<kbd>E</kbd> indicators · <kbd>H</kbd> horn · <kbd>Space</kbd> handbrake · <kbd>V</kbd> camera · gamepad and touch supported</p>
+    </div>
+  </div>
+
+  <div id="menu" class="menu" hidden role="dialog" aria-label="Menu">
+    <div class="menu-inner">
+      <header class="menu-head">
+        <h2>Paused</h2>
+        <nav class="tabs" role="tablist">
+          <button type="button" role="tab" data-tab="controls" aria-selected="true">Controls</button>
+          <button type="button" role="tab" data-tab="settings" aria-selected="false">Settings</button>
+          <button type="button" role="tab" data-tab="about" aria-selected="false">How it works</button>
+        </nav>
+        <button id="resume" class="primary" type="button">Resume</button>
+      </header>
+      <div data-panel="controls" class="panel-body">
+        <p class="muted">Click a key to rebind it, then press the new key (Esc cancels). Gamepad layout follows the standard Xbox-style mapping.</p>
+        <div id="controlsList"></div>
+      </div>
+      <div data-panel="settings" class="panel-body" hidden>
+        <div class="settings">
+          <label for="setVehicle">Vehicle<select id="setVehicle"></select></label>
+          <label for="setTrans">Transmission<select id="setTrans"><option value="automatic">Automatic (P R N D)</option><option value="manual">Manual (R N 1–6)</option></select></label>
+          <label class="check" for="setClutch"><input type="checkbox" id="setClutch"> Clutch assist (manual: no stalling)</label>
+          <label class="check" for="setGrip"><input type="checkbox" id="setGrip"> Hold brake to reverse (automatic)</label>
+          <label class="check" for="setAbs"><input type="checkbox" id="setAbs"> ABS</label>
+          <label class="check" for="setTcs"><input type="checkbox" id="setTcs"> Traction control</label>
+          <label class="check" for="setEsc"><input type="checkbox" id="setEsc"> Stability control</label>
+          <label for="setUnit">Speed unit<select id="setUnit"><option value="kmh">km/h</option><option value="mph">mph</option></select></label>
+          <label for="setHour">Time of day<input type="range" id="setHour" min="0" max="23.9" step="0.1"></label>
+          <label for="setTimeScale">Clock speed<select id="setTimeScale"><option value="0">Frozen</option><option value="0.0002778">Real time</option><option value="0.0166667">1 min per second</option><option value="0.0833333">5 min per second</option></select></label>
+          <label for="setWeather">Weather<select id="setWeather"><option value="clear">Clear</option><option value="cloudy">Cloudy</option><option value="rain">Rain</option><option value="storm">Storm</option><option value="fog">Fog</option></select></label>
+          <label class="check" for="setAutoWeather"><input type="checkbox" id="setAutoWeather"> Weather changes by itself</label>
+          <label for="setTraffic">Traffic (vehicles at peak)<input type="range" id="setTraffic" min="0" max="180" step="10"></label>
+          <label for="setPolice">Patrol cars<input type="range" id="setPolice" min="0" max="10" step="1"></label>
+          <label for="setSignals">Signal operation<select id="setSignals"><option value="actuated">Actuated (sensors)</option><option value="fixed">Fixed time</option><option value="flashing">Flashing</option><option value="off">Power cut (dark)</option></select></label>
+          <label for="setVolume">Volume<input type="range" id="setVolume" min="0" max="1" step="0.05"></label>
+          <label class="check" for="setBloom"><input type="checkbox" id="setBloom"> Neon bloom</label>
+          <label for="setQuality">Quality (reload to apply)<select id="setQuality"><option value="high">High</option><option value="low">Low</option></select></label>
+        </div>
+      </div>
+      <div data-panel="about" class="panel-body about" hidden>
+        <div class="about-grid">
+          <section><h3>Signals</h3><p>Each junction builds its own phase plan from its geometry: opposing approaches share a phase, dedicated left lanes get a leading green arrow, and the flashing yellow arrow means turn after yielding. Actuated signals skip empty phases and extend green while their detectors see cars. Minor junctions switch to flashing at 1–5 am.</p></section>
+          <section><h3>Traffic</h3><p>Drivers follow the Intelligent Driver Model, change lanes when the gain beats their politeness, and plan routes with A*. At junctions they judge the yellow-light dilemma, stop fully at stop signs, take turns at all-way stops, wait in the box to turn left, and won't block the box unless they don't care.</p></section>
+          <section><h3>Temper</h3><p>Cutting someone off, tailgating, honking, high beams, gestures and collisions build anger toward you, scaled by each driver's temper and stress. Past a threshold they honk and flash, then tailgate, brake-check or try to ram you. A wave (G) or a hazard blink can calm them. Police nearby end it.</p></section>
+          <section><h3>Law</h3><p>Red lights, stop signs, speed, wrong-way driving, signalling, headlights, seatbelt and hit-and-run are all detected. Cameras mail fines. An officer who sees it pulls you over; stop at the curb for a ticket, or flee and start a pursuit. Twelve points suspends your license.</p></section>
+          <section><h3>Car</h3><p>Rigid-body model with weight transfer, magic-formula tyres and a friction circle. Without ABS the wheels lock, without traction control they spin. The automatic creeps, parks and reverses; the manual has a clutch and stalls if you lug it.</p></section>
+          <section><h3>Engine-agnostic</h3><p>This simulation is written once and also compiles to Lua, so the same code runs inside the Cyberpunk 2077 mod in this project.</p></section>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>/*JS*/</script>

@@ -1,6 +1,7 @@
 node_modules/
 build/
 dist/*
+!dist/gridlock.html
 !dist/.gitkeep
 *.log
 .DS_Store
