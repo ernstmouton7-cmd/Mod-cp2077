@@ -1,0 +1,41 @@
+[package]
+name = "gridlock-assets"
+description = "Asset manifest, downloader and CPU-side loaders (textures, HDRIs, glTF) for the Gridlock engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "gridlock_assets"
+path = "src/lib.rs"
+
+[[bin]]
+name = "fetch-assets"
+path = "src/bin/fetch_assets.rs"
+required-features = ["fetch"]
+
+[[bin]]
+name = "gen-manifest"
+path = "src/bin/gen_manifest.rs"
+required-features = ["fetch"]
+
+[features]
+default = ["fetch"]
+# HTTP downloader + manifest generator (ureq/rustls/zip). Renderers can use
+# `default-features = false` to get only the loaders.
+fetch = ["dep:ureq", "dep:rustls-native-certs", "dep:md5", "dep:zip", "dep:serde_json"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+toml = "1"
+serde_json = { version = "1", optional = true }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "hdr", "exr"] }
+gltf = { version = "1.4", default-features = false, features = ["import", "utils", "names", "KHR_materials_emissive_strength", "KHR_materials_transmission", "KHR_materials_ior", "KHR_texture_transform"] }
+bevy_mikktspace = "1"
+half = "2"
+glam = { workspace = true }
+ureq = { version = "3", default-features = false, features = ["rustls"], optional = true }
+rustls-native-certs = { version = "0.8", optional = true }
+md5 = { package = "md-5", version = "0.10", optional = true }
+zip = { version = "9", default-features = false, features = ["deflate-flate2"], optional = true }

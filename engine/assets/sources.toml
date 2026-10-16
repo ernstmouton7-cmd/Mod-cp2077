@@ -1,0 +1,330 @@
+# Asset selection for Gridlock. This is the hand-edited input; `manifest.toml`
+# and `LICENSES.md` are generated from it by
+#
+#     cargo run -p gridlock-assets --bin gen-manifest --release
+#
+# which queries the Poly Haven / ambientCG APIs for exact URLs, sizes and MD5s
+# at 1k/2k/4k, and verifies on each asset's own page that it is CC0
+# (assets that fail the check are dropped with a warning).
+#
+# Fields:
+#   id        stable name used by engine code (tex.*, hdri.*, model.*)
+#   kind      texture | hdri | model
+#   source    polyhaven | ambientcg
+#   slug      the asset's id on that site
+#   maps      (textures, optional) subset of: albedo normal arm roughness metalness ao height
+#             emission opacity. Default: polyhaven = albedo normal arm height;
+#             ambientcg = every map the asset has (normal in GL convention).
+#   max_res   (optional) cap for `fetch-assets --res`
+#   optional  (optional) true = only fetched with --all or a matching --only
+#   metalness (optional) default metalness when the material has no metalness map
+#   notes     free text, copied to the manifest
+#
+# Not here on purpose: road markings, car paint, wet-asphalt puddles and window
+# glass are procedural in the renderer.
+
+# ---------------------------------------------------------------- road surface
+[[asset]]
+id = "tex.asphalt"
+kind = "texture"
+source = "polyhaven"
+slug = "clean_asphalt"
+notes = "Main road surface: fresh, even dark-grey city asphalt. Wet look is procedural (darken albedo, lower roughness, puddle mask)."
+
+[[asset]]
+id = "tex.asphalt_cracked"
+kind = "texture"
+source = "polyhaven"
+slug = "asphalt_02"
+notes = "Weathered asphalt with tar-sealed cracks; side streets, patches, blend layer."
+
+[[asset]]
+id = "tex.asphalt_worn"
+kind = "texture"
+source = "polyhaven"
+slug = "asphalt_04"
+notes = "Old, sun-faded light-grey asphalt with fine cracks; parking lots, alleys."
+
+# ---------------------------------------------------------------- sidewalk / curb / verge
+[[asset]]
+id = "tex.concrete_sidewalk"
+kind = "texture"
+source = "polyhaven"
+slug = "concrete_pavement_02"
+notes = "Square poured-concrete sidewalk slabs with control joints (North-American style)."
+
+[[asset]]
+id = "tex.curb"
+kind = "texture"
+source = "polyhaven"
+slug = "concrete_wall_008"
+notes = "Light weathered cast concrete with hairline cracks and chips; curbs, barriers, gutters. Use triplanar or a curb UV strip. (concrete_floor_worn_001 was rejected: its normal map's X axis disagrees with its height map.)"
+
+[[asset]]
+id = "tex.grass"
+kind = "texture"
+source = "ambientcg"
+slug = "Grass004"
+notes = "Dense green lawn for verges, medians and parks."
+
+[[asset]]
+id = "tex.dirt"
+kind = "texture"
+source = "polyhaven"
+slug = "dirt"
+notes = "Compacted dusty soil; tree pits, construction lots, worn verges."
+
+# ---------------------------------------------------------------- building facades
+[[asset]]
+id = "tex.brick_facade"
+kind = "texture"
+source = "polyhaven"
+slug = "red_brick"
+notes = "Classic red brick with grey mortar; walk-ups and older downtown blocks."
+
+[[asset]]
+id = "tex.brick_industrial"
+kind = "texture"
+source = "polyhaven"
+slug = "brick_wall_001"
+notes = "Grimy dark-red industrial brick; warehouses, back alleys."
+
+[[asset]]
+id = "tex.plaster"
+kind = "texture"
+source = "polyhaven"
+slug = "painted_plaster_wall"
+notes = "Slightly stained exterior painted plaster/stucco; tint per building."
+
+[[asset]]
+id = "tex.concrete_panels"
+kind = "texture"
+source = "polyhaven"
+slug = "concrete_slab_wall"
+notes = "Weathered precast concrete panels with horizontal joints; parking structures, mid-century offices."
+
+[[asset]]
+id = "tex.facade_tiles"
+kind = "texture"
+source = "polyhaven"
+slug = "concrete_tile_facade"
+notes = "Dark grooved square facade tiles for modern buildings / ground-floor retail."
+
+[[asset]]
+id = "tex.siding"
+kind = "texture"
+source = "polyhaven"
+slug = "exterior_wall_cladding_03"
+notes = "Painted horizontal lap siding; residential side streets."
+
+[[asset]]
+id = "tex.facade_office"
+kind = "texture"
+source = "ambientcg"
+slug = "Facade018A"
+notes = "Brick office facade with window grid (~13 m tile) including an emission map for lit windows at night; distant/mid buildings."
+
+[[asset]]
+id = "tex.facade_glass_curtain"
+kind = "texture"
+source = "ambientcg"
+slug = "Facade001"
+notes = "Reflective glass curtain wall with mullions; towers. Pair with the HDRI for reflections."
+
+[[asset]]
+id = "tex.roof_gravel"
+kind = "texture"
+source = "polyhaven"
+slug = "gravel"
+notes = "Dark compacted gravel; flat-roof ballast, rail beds."
+
+# ---------------------------------------------------------------- metals / rubber
+[[asset]]
+id = "tex.metal_painted"
+kind = "texture"
+source = "polyhaven"
+slug = "blue_metal_plate"
+notes = "Scuffed semi-gloss painted steel plate; utility boxes, signal cabinets (desaturate/tint)."
+
+[[asset]]
+id = "tex.metal_powder_coat"
+kind = "texture"
+source = "ambientcg"
+slug = "Metal027"
+notes = "Black powder-coated steel; signal poles, mast arms, lamp posts, railings."
+
+[[asset]]
+id = "tex.metal_corrugated"
+kind = "texture"
+source = "polyhaven"
+slug = "corrugated_iron"
+metalness = 1.0
+notes = "Weathered galvanised corrugated sheet; roofs, fences, sheds."
+
+[[asset]]
+id = "tex.metal_shutter"
+kind = "texture"
+source = "polyhaven"
+slug = "painted_metal_shutter"
+notes = "Painted ribbed roller shutter; closed shopfronts at night."
+
+[[asset]]
+id = "tex.rubber"
+kind = "texture"
+source = "ambientcg"
+slug = "Rubber004"
+max_res = "1k"
+notes = "Fine black rubber micro-surface for tyres (tread/sidewall shapes are procedural). Capped at 1k: the detail is tiny."
+
+# ---------------------------------------------------------------- HDRIs (sky + IBL)
+[[asset]]
+id = "hdri.day_clear"
+kind = "hdri"
+source = "polyhaven"
+slug = "kloofendal_43d_clear_puresky"
+notes = "Clear midday sky, sun ~43 deg, no ground clutter (pure sky)."
+
+[[asset]]
+id = "hdri.day_partly_cloudy"
+kind = "hdri"
+source = "polyhaven"
+slug = "kloofendal_48d_partly_cloudy_puresky"
+notes = "Midday, scattered cumulus (pure sky)."
+
+[[asset]]
+id = "hdri.overcast"
+kind = "hdri"
+source = "polyhaven"
+slug = "overcast_soil_puresky"
+notes = "Flat overcast sky; also the base for rain (pure sky)."
+
+[[asset]]
+id = "hdri.sunset"
+kind = "hdri"
+source = "polyhaven"
+slug = "belfast_sunset_puresky"
+notes = "Golden hour / sunset, low warm sun (pure sky)."
+
+[[asset]]
+id = "hdri.dusk"
+kind = "hdri"
+source = "polyhaven"
+slug = "qwantani_dusk_2_puresky"
+notes = "Blue hour after sunset (pure sky); transition to night."
+
+[[asset]]
+id = "hdri.night_city"
+kind = "hdri"
+source = "polyhaven"
+slug = "modern_buildings_night"
+notes = "Night between modern city buildings with street lighting; urban night IBL/reflections."
+
+[[asset]]
+id = "hdri.night_rain"
+kind = "hdri"
+source = "polyhaven"
+slug = "vignaioli_night"
+optional = true
+notes = "Rainy night on a lit (European) square: wet reflections reference."
+
+[[asset]]
+id = "hdri.day_city_street"
+kind = "hdri"
+source = "polyhaven"
+slug = "wide_street_01"
+optional = true
+notes = "Sunny midday city street with buildings: urban reflection probe / look-dev reference."
+
+# ---------------------------------------------------------------- street furniture (glTF)
+[[asset]]
+id = "model.fire_hydrant"
+kind = "model"
+source = "polyhaven"
+slug = "fire_hydrant"
+notes = "Red North-American style pillar hydrant (clean + aged texture variants)."
+
+[[asset]]
+id = "model.concrete_barrier"
+kind = "model"
+source = "polyhaven"
+slug = "concrete_road_barrier"
+notes = "Jersey-style concrete road barrier; work zones, medians."
+
+[[asset]]
+id = "model.bench"
+kind = "model"
+source = "polyhaven"
+slug = "modular_street_seating"
+notes = "Modular contemporary street bench (several parts in one file)."
+
+[[asset]]
+id = "model.electricity_pole"
+kind = "model"
+source = "polyhaven"
+slug = "modular_electricity_poles"
+notes = "Wooden utility poles with cross-arms, insulators and transformer parts (modular kit in one file)."
+
+[[asset]]
+id = "model.trash_can"
+kind = "model"
+source = "polyhaven"
+slug = "metal_trash_can"
+notes = "Galvanised metal trash can with lid."
+
+[[asset]]
+id = "model.utility_box"
+kind = "model"
+source = "polyhaven"
+slug = "utility_box_02"
+notes = "Green roadside electrical cabinet."
+
+[[asset]]
+id = "model.manhole_cover"
+kind = "model"
+source = "polyhaven"
+slug = "water_manhole_cover"
+notes = "Cast-iron manhole cover ('WATER')."
+
+[[asset]]
+id = "model.chainlink_fence"
+kind = "model"
+source = "polyhaven"
+slug = "modular_chainlink_fence"
+notes = "Modular chain-link fence panels and posts; vacant lots, construction."
+
+[[asset]]
+id = "model.street_lamp_victorian"
+kind = "model"
+source = "polyhaven"
+slug = "street_lamp_01"
+notes = "Victorian lantern lamp post for historic districts/parks. Modern cobra-head and signal poles are procedural (no CC0 photoreal source found)."
+
+[[asset]]
+id = "model.shrub"
+kind = "model"
+source = "polyhaven"
+slug = "shrub_04"
+notes = "Small leafy shrubs (several variants in one file); planters and verges."
+
+[[asset]]
+id = "model.trash_bag"
+kind = "model"
+source = "polyhaven"
+slug = "trashbag"
+notes = "Black garbage bag for curbside clutter."
+
+[[asset]]
+id = "model.tree_small"
+kind = "model"
+source = "polyhaven"
+slug = "tree_small_02"
+optional = true
+notes = "Small broadleaf street tree, ~4.6 M triangles (115 MB at 2k): reference/hero only, decimate or impostor it for street rows."
+
+[[asset]]
+id = "model.tree_jacaranda"
+kind = "model"
+source = "polyhaven"
+slug = "jacaranda_tree"
+optional = true
+notes = "Large broadleaf tree, ~0.3 M polygons but 230 MB of geometry at 2k: hero/reference only."
