@@ -198,6 +198,17 @@ export class VehicleView {
   private s1 = new THREE.Vector3(1, 1, 1);
   private tmpColor = new THREE.Color();
   private pose = { x: 0, y: 0, h: 0 };
+  // Scratch matrices (no per-frame allocation).
+  private bm = new THREE.Matrix4();
+  private wm = new THREE.Matrix4();
+  private tm = new THREE.Matrix4();
+  private rotM = new THREE.Matrix4();
+  private spinM = new THREE.Matrix4();
+  private scM = new THREE.Matrix4();
+  private beamQ = new THREE.Quaternion();
+  private up = new THREE.Vector3(0, 1, 0);
+  private dark = new THREE.Color(0.05, 0.05, 0.05);
+  private beamPos = new THREE.Vector3();
   /** Smoothed body pitch/roll per vehicle. */
   private sway: Map<number, { p: number; r: number }> = new Map();
   maxDistance = 330;
@@ -257,11 +268,12 @@ export class VehicleView {
     this.group.add(this.headlight, this.headlight.target, this.tailGlow);
   }
 
+  private counts = new Map<VehicleClass, number>();
   /** Hide the player's own lamp glows (hood/cockpit views). */
   hidePlayerGlow = false;
 
   update(world: World, hist: PoseHistory, alpha: number, cam: THREE.Vector3, night: number): void {
-    const counts = new Map<VehicleClass, number>();
+    const counts = this.counts;
     for (const cls of CLASSES) counts.set(cls, 0);
     let wheelN = 0;
     let lampN = 0;
@@ -296,9 +308,9 @@ export class VehicleView {
       body.setMatrixAt(idx, this.m);
       const dmg = v.damage.body();
       this.tmpColor.setHex(v.color).convertSRGBToLinear();
-      if (dmg < 1) this.tmpColor.lerp(new THREE.Color(0.05, 0.05, 0.05), (1 - dmg) * 0.6);
+      if (dmg < 1) this.tmpColor.lerp(this.dark, (1 - dmg) * 0.6);
       body.setColorAt(idx, this.tmpColor);
-      const bodyMatrix = this.m.clone();
+      const bodyMatrix = this.bm.copy(this.m);
       // Wheels.
       const spec = v.spec;
       const wr = spec.wheelRadius;
@@ -308,12 +320,9 @@ export class VehicleView {
         const front = k < 2;
         const side = k % 2 === 0 ? -1 : 1;
         const steer = front ? v.wheelAngle : 0;
-        const wm = new THREE.Matrix4().makeTranslation(front ? wx : -wx, wr, side * wz);
-        const rot = new THREE.Matrix4().makeRotationY(steer);
-        const spin = new THREE.Matrix4().makeRotationZ(-v.wheelSpin);
-        const sc = new THREE.Matrix4().makeScale(wr, wr, 0.26);
-        wm.multiply(rot).multiply(spin).multiply(sc);
-        this.wheels.setMatrixAt(wheelN++, bodyMatrix.clone().multiply(wm));
+        const wm = this.wm.makeTranslation(front ? wx : -wx, wr, side * wz);
+        wm.multiply(this.rotM.makeRotationY(steer)).multiply(this.spinM.makeRotationZ(-v.wheelSpin)).multiply(this.scM.makeScale(wr, wr, 0.26));
+        this.wheels.setMatrixAt(wheelN++, this.tm.multiplyMatrices(bodyMatrix, wm));
       }
       // Lamps.
       const lights = v.lights;
@@ -356,8 +365,8 @@ export class VehicleView {
           default:
             c = lowOn ? C.roofOn : C.roofOff;
         }
-        const lm = new THREE.Matrix4().makeTranslation(L.x, L.y, L.z).multiply(new THREE.Matrix4().makeScale(L.sx, L.sy, L.sz));
-        this.lamps.setMatrixAt(lampN, bodyMatrix.clone().multiply(lm));
+        const lm = this.wm.makeTranslation(L.x, L.y, L.z).multiply(this.scM.makeScale(L.sx, L.sy, L.sz));
+        this.lamps.setMatrixAt(lampN, this.tm.multiplyMatrices(bodyMatrix, lm));
         this.lamps.setColorAt(lampN, c);
         lampN++;
         // Glow sprites for lit lamps.
@@ -378,9 +387,11 @@ export class VehicleView {
       // Headlight pool on the road at night.
       if ((lowOn || highOn) && night > 0.15 && !(lights.leftHeadlightBroken && lights.rightHeadlightBroken)) {
         const len = highOn ? 26 : 15;
-        const bm = new THREE.Matrix4().makeTranslation(spec.length / 2 + len / 2 - 0.5, -0.0, 0).multiply(new THREE.Matrix4().makeScale(len, 1, spec.width * (highOn ? 2.6 : 2.2)));
-        const world4 = new THREE.Matrix4().compose(new THREE.Vector3(pose.x, 0.06, -pose.y), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), pose.h), this.s1);
-        this.beams.setMatrixAt(beamN, world4.multiply(bm));
+        const local = this.wm.makeTranslation(spec.length / 2 + len / 2 - 0.5, 0, 0).multiply(this.scM.makeScale(len, 1, spec.width * (highOn ? 2.6 : 2.2)));
+        this.beamPos.set(pose.x, 0.06, -pose.y);
+        this.beamQ.setFromAxisAngle(this.up, pose.h);
+        this.tm.compose(this.beamPos, this.beamQ, this.s1);
+        this.beams.setMatrixAt(beamN, this.tm.multiply(local));
         const k = (highOn ? 0.55 : 0.4) * night;
         this.tmpColor.setRGB(k, k * 0.96, k * 0.88);
         this.beams.setColorAt(beamN, this.tmpColor);

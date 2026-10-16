@@ -133,19 +133,21 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .bubble.mood-angry::after, .bubble.mood-furious::after { border-top-color: var(--neon); }
 .dbg { position: absolute; left: 0; top: 0; font-family: var(--font-mono); font-size: 0.6rem; background: rgba(0, 0, 0, 0.65); color: var(--sig-green); padding: 1px 4px; white-space: nowrap; }
 
-/* Touch */
-.touch { position: absolute; inset: auto 0 0 0; display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); pointer-events: none; z-index: 4; }
-.touch button { pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; background: rgba(13, 14, 19, 0.55); border: 1px solid var(--line); border-radius: 10px; color: var(--ink); font-weight: 700; }
+/* Touch: a strip of equipment buttons above steering (left) and pedals (right). */
+.touch { position: absolute; inset: auto 0 0 0; display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: "mid mid mid" "left . right"; align-items: end; gap: 8px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); pointer-events: none; z-index: 4; }
+.touch button { pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; background: rgba(13, 14, 19, 0.6); border: 1px solid var(--line); border-radius: 10px; color: var(--ink); font-weight: 700; }
 .touch button.down { background: rgba(255, 179, 92, 0.35); }
-.touch-left { display: flex; gap: 10px; }
-.touch-left button { width: 74px; height: 74px; font-size: 1.6rem; }
-.touch-mid { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; max-width: 330px; }
-.touch-mid button { padding: 7px 9px; font-size: 0.7rem; }
-.touch-right { display: flex; gap: 8px; align-items: flex-end; }
-.pedal { width: 66px; height: 96px; }
-.pedal.gas { height: 116px; }
-.hb { width: 50px; height: 50px; }
+.touch-left { grid-area: left; display: flex; gap: 8px; }
+.touch-left button { width: 64px; height: 64px; font-size: 1.4rem; }
+.touch-mid { grid-area: mid; display: flex; gap: 5px; overflow-x: auto; scrollbar-width: none; pointer-events: auto; padding-bottom: 2px; }
+.touch-mid::-webkit-scrollbar { display: none; }
+.touch-mid button { flex: none; padding: 8px 10px; font-size: 0.72rem; }
+.touch-right { grid-area: right; display: flex; gap: 8px; align-items: flex-end; }
+.pedal { width: 58px; height: 86px; font-size: 0.8rem; }
+.pedal.gas { height: 104px; }
+.hb { width: 46px; height: 46px; font-size: 0.75rem; }
 body:has(.touch:not([hidden])) .hint { display: none; }
+body:has(.title:not([hidden])) .touch { display: none; }
 
 /* Title */
 .title { position: absolute; inset: 0; display: flex; align-items: center; background: linear-gradient(90deg, rgba(13, 14, 19, 0.92) 0%, rgba(13, 14, 19, 0.7) 45%, rgba(13, 14, 19, 0.05) 100%); z-index: 10; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px; overflow-y: auto; }
@@ -203,7 +205,11 @@ body:has(.touch:not([hidden])) .hint { display: none; }
   .map-wrap { width: 110px; height: 110px; }
   .hint { display: none; }
   .moods { display: none; }
-  body:has(.touch:not([hidden])) .hud-bottom { margin-bottom: 120px; }
+  body:has(.touch:not([hidden])) .hud-bottom { margin-bottom: 158px; }
+  body:has(.touch:not([hidden])) .cluster-wrap { width: 150px; }
+  body:has(.touch:not([hidden])) #cluster { height: 100px; }
+  .status { gap: 2px; }
+  .status .panel-label { letter-spacing: 0.06em; }
 }
 @media (prefers-reduced-motion: reduce) {
   .police-state, .banner[data-kind="police"], #larrow[data-lamp="flash"] { animation: none; }

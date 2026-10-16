@@ -392,8 +392,8 @@ export class Hud {
     const spec = p.spec;
     const pt = p.pt;
     const cx = cw / 2;
-    const cy = ch * 0.62;
-    const R = Math.min(cw * 0.42, ch * 0.56);
+    const cy = ch * 0.56;
+    const R = Math.min(cw * 0.42, ch * 0.5);
     const maxRpm = Math.ceil((spec.redline + 600) / 1000) * 1000;
     const a0 = Math.PI * 0.8;
     const a1 = Math.PI * 2.2;
@@ -441,10 +441,12 @@ export class Hud {
     // Gear.
     g.font = `800 ${Math.round(R * 0.34)}px 'Overpass Mono', monospace`;
     g.fillStyle = gearText === "R" ? "#ff4d3d" : gearText === "P" || gearText === "N" ? "#9a978f" : "#ffb35c";
-    g.fillText(gearText, cx, cy + R * 0.62);
-    g.font = "600 9px 'Overpass Mono', monospace";
-    g.fillStyle = "rgba(233,230,220,0.5)";
-    g.fillText("RPM ×1000", cx, cy - R * 0.58);
+    g.fillText(gearText, cx, cy + R * 0.66);
+    if (R > 55) {
+      g.font = "600 9px 'Overpass Mono', monospace";
+      g.fillStyle = "rgba(233,230,220,0.5)";
+      g.fillText("RPM ×1000", cx, cy - R * 0.58);
+    }
   }
 
   private drawMinimap(p: Vehicle): void {
