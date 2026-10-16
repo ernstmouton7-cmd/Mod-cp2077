@@ -76,6 +76,8 @@ export class SignalController {
   private mainApproaches: Approach[] = [];
   private readonly pedWalkTime = 7;
   onChange: ((c: SignalChange) => void) | undefined = undefined;
+  /** Approach ids that have a protected left arrow head. */
+  private readonly arrowApproaches: number[] = [];
 
   constructor(
     readonly id: number,
@@ -180,6 +182,7 @@ export class SignalController {
       });
       gi++;
     }
+    for (const p of this.phases) if (p.isLeftArrow) for (const a of p.approaches) if (this.arrowApproaches.indexOf(a.id) < 0) this.arrowApproaches.push(a.id);
     // Start on the main through phase.
     for (let i = 0; i < this.phases.length; i++) {
       if (this.phases[i].recall) {
@@ -189,20 +192,20 @@ export class SignalController {
     }
   }
 
-  get currentPhase(): Phase {
+  currentPhase(): Phase {
     return this.phases[this.phaseIndex];
   }
 
-  get phaseState(): PhaseState {
+  phaseState(): PhaseState {
     return this.state;
   }
 
-  get stateTime(): number {
+  stateTime(): number {
     return this.t;
   }
 
   /** Cycle length of the fixed plan (seconds). */
-  get cycleLength(): number {
+  cycleLength(): number {
     let c = 0;
     for (const p of this.phases) c += p.fixedGreen + p.yellow + p.allRed;
     return c;
@@ -224,7 +227,7 @@ export class SignalController {
     this.preemptTtl = 1.0;
   }
 
-  get preempting(): boolean {
+  preempting(): boolean {
     return this.preemptApproach >= 0;
   }
 
@@ -248,7 +251,7 @@ export class SignalController {
   }
 
   private emit(): void {
-    if (this.onChange !== undefined) this.onChange({ nodeId: this.node.id, phase: this.currentPhase.name, state: this.state });
+    if (this.onChange !== undefined) this.onChange({ nodeId: this.node.id, phase: this.currentPhase().name, state: this.state });
   }
 
   private pickNextPhase(demand: DemandFn | undefined): number {
@@ -269,7 +272,7 @@ export class SignalController {
 
   /** Should the current green end now? */
   private greenShouldEnd(demand: DemandFn | undefined, dt: number): boolean {
-    const p = this.currentPhase;
+    const p = this.currentPhase();
     if (this.preemptApproach >= 0) {
       return !this.phaseServesApproach(p, this.preemptApproach) && this.t >= Math.min(p.minGreen, 4);
     }
@@ -299,7 +302,7 @@ export class SignalController {
     }
     if (this.mode === "flashing" || this.mode === "off") return;
     this.t += dt;
-    const p = this.currentPhase;
+    const p = this.currentPhase();
     if (this.state === "green") {
       if (this.greenShouldEnd(demand, dt)) {
         this.state = "yellow";
@@ -333,7 +336,7 @@ export class SignalController {
   indication(c: Connector): Indication {
     if (this.mode === "off") return "dark";
     if (this.mode === "flashing") return this.isMain(c.approach) ? "flash_yellow" : "flash_red";
-    const p = this.currentPhase;
+    const p = this.currentPhase();
     const right = p.serves.get(c.id);
     if (right === undefined || this.state === "allred") return "red";
     if (this.state === "yellow") return "yellow";
@@ -348,7 +351,7 @@ export class SignalController {
   /** Signal-head display for an approach. */
   head(a: Approach): HeadState {
     const out: HeadState = { ball: "red", arrow: undefined, ballFlashing: false, ped: "dont", pedCountdown: 0 };
-    const hasArrow = this.phases.some((p) => p.isLeftArrow && p.approaches.indexOf(a) >= 0);
+    const hasArrow = this.arrowApproaches.indexOf(a.id) >= 0;
     if (hasArrow) out.arrow = "off";
     if (this.mode === "off") {
       out.ball = "off";
@@ -362,7 +365,7 @@ export class SignalController {
       out.ped = "off";
       return out;
     }
-    const p = this.currentPhase;
+    const p = this.currentPhase();
     const inPhase = p.approaches.indexOf(a) >= 0;
     const lamp: Lamp = this.state === "green" ? "green" : this.state === "yellow" ? "yellow" : "red";
     if (inPhase && this.state !== "allred") {
@@ -395,6 +398,6 @@ export class SignalController {
 
   /** Is approach `a` part of the active phase and the phase in green? */
   isGreenFor(a: Approach): boolean {
-    return this.state === "green" && this.currentPhase.approaches.indexOf(a) >= 0 && !this.currentPhase.isLeftArrow;
+    return this.state === "green" && this.currentPhase().approaches.indexOf(a) >= 0 && !this.currentPhase().isLeftArrow;
   }
 }

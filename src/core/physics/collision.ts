@@ -94,10 +94,10 @@ export function resolveBodies(a: VehicleDynamics, b: VehicleDynamics, c: Contact
   const ray = c.py - a.y;
   const rbx = c.px - b.x;
   const rby = c.py - b.y;
-  const vax = a.vx - a.r * ray;
-  const vay = a.vy + a.r * rax;
-  const vbx = b.vx - b.r * rby;
-  const vby = b.vy + b.r * rbx;
+  const vax = a.vx() - a.r * ray;
+  const vay = a.vy() + a.r * rax;
+  const vbx = b.vx() - b.r * rby;
+  const vby = b.vy() + b.r * rbx;
   const rvx = vbx - vax;
   const rvy = vby - vay;
   const vn = rvx * c.nx + rvy * c.ny;
@@ -138,8 +138,8 @@ export function resolveStatic(a: VehicleDynamics, c: Contact, restitution: numbe
   const ray = c.py - a.y;
   a.x -= c.nx * Math.max(0, c.depth - 0.005);
   a.y -= c.ny * Math.max(0, c.depth - 0.005);
-  const vax = a.vx - a.r * ray;
-  const vay = a.vy + a.r * rax;
+  const vax = a.vx() - a.r * ray;
+  const vay = a.vy() + a.r * rax;
   const vn = -(vax * c.nx + vay * c.ny);
   if (vn >= 0) return 0;
   const invA = 1 / a.mass;

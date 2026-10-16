@@ -40,14 +40,14 @@ export class Powertrain {
   /** Speed limiter target (m/s); 0 = off. */
   limiter = 0;
 
+  readonly maxGear: number;
+
   constructor(readonly spec: VehicleSpec) {
+    this.maxGear = spec.gears.length;
     this.rpm = spec.idleRpm;
     this.fuel = spec.fuelCapacity * 0.75;
   }
 
-  get maxGear(): number {
-    return this.spec.gears.length;
-  }
 
   ratio(g: Gear): number {
     if (g === 0) return 0;
@@ -55,7 +55,7 @@ export class Powertrain {
     return this.spec.gears[g - 1];
   }
 
-  get shifting(): boolean {
+  shifting(): boolean {
     return this.shiftTimer > 0;
   }
 

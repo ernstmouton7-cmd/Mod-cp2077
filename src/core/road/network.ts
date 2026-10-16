@@ -73,6 +73,10 @@ export class Road {
   trimB = 0;
   /** Has a speed camera somewhere along it. */
   speedCamera = false;
+  readonly kind: RoadKind;
+  readonly name: string;
+  /** Total carriageway width. */
+  readonly width: number;
 
   constructor(
     readonly id: number,
@@ -89,21 +93,11 @@ export class Road {
     this.medianWidth = opts.medianWidth ?? (opts.lanesBack > 0 && opts.lanesFwd > 0 ? 0.3 : 0);
     this.sidewalkWidth = opts.sidewalkWidth ?? 3;
     this.speedLimit = opts.speedLimitKmh * KMH;
-  }
-
-  get kind(): RoadKind {
-    return this.opts.kind;
-  }
-
-  get name(): string {
-    return this.opts.name;
-  }
-
-  /** Total carriageway width. */
-  get width(): number {
-    const n = this.opts.lanesFwd + this.opts.lanesBack;
-    const m = this.opts.lanesBack === 0 || this.opts.lanesFwd === 0 ? 0 : this.medianWidth;
-    return n * this.laneWidth + m;
+    this.kind = opts.kind;
+    this.name = opts.name;
+    const n = opts.lanesFwd + opts.lanesBack;
+    const m = opts.lanesBack === 0 || opts.lanesFwd === 0 ? 0 : this.medianWidth;
+    this.width = n * this.laneWidth + m;
   }
 
   /** Lanes arriving at node n. */
@@ -179,6 +173,7 @@ export class Lane implements Segment {
 export class Connector implements Segment {
   readonly kind = "connector" as const;
   readonly conflicts: ConflictZone[] = [];
+  readonly approach: Approach;
   /** Connectors starting from the same lane (diverging). */
   readonly siblings: Connector[] = [];
   /** For each sibling: arc length (on this connector) where the paths have separated. */
@@ -197,6 +192,7 @@ export class Connector implements Segment {
     readonly path: Path,
   ) {
     this.length = path.length;
+    this.approach = from.approach as Approach;
     // Comfortable lateral acceleration ~2.5 m/s^2 through the turn.
     let maxCurv = 0;
     const steps = Math.max(2, Math.floor(path.length / 2));
@@ -208,9 +204,6 @@ export class Connector implements Segment {
     this.speedLimit = Math.min(Math.max(from.speedLimit, to.speedLimit), Math.max(3.5, turnSpeed));
   }
 
-  get approach(): Approach {
-    return this.from.approach as Approach;
-  }
 }
 
 /** The set of lanes entering a node from one road. Signals and signs attach here. */
@@ -559,7 +552,16 @@ export class Network {
       const d = Math.sqrt(tmp.d2);
       if (d <= radius) out.push({ lane: l, s: tmp.s, lateral: tmp.lateral, dist: d });
     }
-    out.sort((p, q) => (p.dist !== q.dist ? p.dist - q.dist : p.lane.id - q.lane.id));
+    // Insertion sort: tiny arrays, and no closure allocation (LuaJIT-friendly).
+    for (let i = 1; i < out.length; i++) {
+      const h = out[i];
+      let j = i - 1;
+      while (j >= 0 && (out[j].dist > h.dist || (out[j].dist === h.dist && out[j].lane.id > h.lane.id))) {
+        out[j + 1] = out[j];
+        j--;
+      }
+      out[j + 1] = h;
+    }
     return out;
   }
 

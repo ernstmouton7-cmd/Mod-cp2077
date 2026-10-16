@@ -81,7 +81,7 @@ export class PlayerMonitor {
   update(dt: number, p: Vehicle, ctx: SimContext, out: Observation[]): void {
     const now = ctx.time;
     const info = this.info;
-    const speed = p.absSpeed;
+    const speed = p.absSpeed();
     const lights = p.lights;
     if (lights.indicator === "left" || lights.hazard) this.signalLeftAt = now;
     if (lights.indicator === "right" || lights.hazard) this.signalRightAt = now;
@@ -223,12 +223,12 @@ export class PlayerMonitor {
     // --- Emergency vehicles behind with siren.
     let emergencyBehind = false;
     for (const e of ctx.vehicles) {
-      if (!e.sirenOn || e === p) continue;
+      if (!e.sirenOn() || e === p) continue;
       const dx = e.x - p.x;
       const dy = e.y - p.y;
       if (dx * dx + dy * dy > 45 * 45) continue;
       const behind = dx * Math.cos(p.heading) + dy * Math.sin(p.heading) < -3;
-      if (behind && Math.abs(angleDiff(p.heading, e.heading)) < 45 * DEG && e.absSpeed > 4) emergencyBehind = true;
+      if (behind && Math.abs(angleDiff(p.heading, e.heading)) < 45 * DEG && e.absSpeed() > 4) emergencyBehind = true;
     }
     if (emergencyBehind && speed > 4) {
       this.emergencyBehindTime += dt;

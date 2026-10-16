@@ -134,7 +134,7 @@ export class PlayerDriver {
       if (this.settings.clutchAssist && f.clutch < 0.05) {
         const wheelRpm = Math.abs(v.dyn.drivenOmega() * pt.ratio(pt.gear) * v.spec.finalDrive) * 9.549;
         const idle = v.spec.idleRpm;
-        if (pt.shifting) pt.clutchPedal = 1;
+        if (pt.shifting()) pt.clutchPedal = 1;
         else if (pt.gear !== 0 && wheelRpm < idle * 1.15) pt.clutchPedal = clamp(1 - throttle * 1.6 - (wheelRpm / idle) * 0.5, 0, 1);
         else pt.clutchPedal = 0;
       } else pt.clutchPedal = f.clutch;

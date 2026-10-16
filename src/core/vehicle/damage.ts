@@ -12,12 +12,12 @@ export class DamageModel {
   impacts = 0;
 
   /** Overall body health 0..1. */
-  get body(): number {
+  body(): number {
     return (this.front + this.rear + this.left + this.right) / 4;
   }
 
-  get totaled(): boolean {
-    return this.body < 0.2 || this.front < 0.05;
+  totaled(): boolean {
+    return this.body() < 0.2 || this.front < 0.05;
   }
 
   /**

@@ -29,7 +29,7 @@ export class PoliceSystem {
   /** Set by the world: spawns a police car near (x, y) out of sight. */
   spawnUnit: ((x: number, y: number) => Vehicle | undefined) | undefined = undefined;
 
-  get active(): boolean {
+  active(): boolean {
     return this.stage !== "none";
   }
 
@@ -139,7 +139,7 @@ export class PoliceSystem {
     const lead = this.units[0];
     const leadDriver = ctx.driverOf(lead);
     const dist = hypot(lead.x - p.x, lead.y - p.y);
-    const speed = p.absSpeed;
+    const speed = p.absSpeed();
 
     // Units not yet close drive on the road network toward the player.
     this.routeTimer -= dt;

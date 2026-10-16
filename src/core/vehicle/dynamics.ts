@@ -79,15 +79,15 @@ export class VehicleDynamics {
     this.b = spec.wheelbase * spec.frontWeight;
   }
 
-  get speed(): number {
+  absSpeed(): number {
     return Math.sqrt(this.u * this.u + this.v * this.v);
   }
 
-  get vx(): number {
+  vx(): number {
     return this.u * Math.cos(this.yaw) - this.v * Math.sin(this.yaw);
   }
 
-  get vy(): number {
+  vy(): number {
     return this.u * Math.sin(this.yaw) + this.v * Math.cos(this.yaw);
   }
 
@@ -123,8 +123,8 @@ export class VehicleDynamics {
 
   /** Apply an impulse (N·s) at world point (px, py). */
   applyImpulse(jx: number, jy: number, px: number, py: number): void {
-    const vx = this.vx + jx / this.mass;
-    const vy = this.vy + jy / this.mass;
+    const vx = this.vx() + jx / this.mass;
+    const vy = this.vy() + jy / this.mass;
     const rx = px - this.x;
     const ry = py - this.y;
     this.r += (rx * jy - ry * jx) / this.iz;
@@ -304,8 +304,8 @@ export class VehicleDynamics {
     // Skid intensity: lateral slip past the tyre peak, or locked/spinning wheels.
     const peak = 0.12;
     const latSkid = Math.max(Math.abs(alphaF), Math.abs(alphaR)) - peak;
-    let skid = clamp(latSkid * 5, 0, 1) * clamp(this.speed / 6, 0, 1);
-    if ((this.frontLocked || this.rearLocked) && this.speed > 1) skid = Math.max(skid, 0.9);
+    let skid = clamp(latSkid * 5, 0, 1) * clamp(this.absSpeed() / 6, 0, 1);
+    if ((this.frontLocked || this.rearLocked) && this.absSpeed() > 1) skid = Math.max(skid, 0.9);
     if (spinF) skid = Math.max(skid, 0.7);
     this.skid = skid;
   }

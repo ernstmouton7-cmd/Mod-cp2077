@@ -107,12 +107,13 @@ export class AIDriver implements DriverView {
     this.distractCheck = this.rng.range(0, 1);
   }
 
-  get mood(): Mood {
-    return this.emo.mood;
-  }
+  /** Mirrors of emotion state (plain fields: cheap in Lua). */
+  mood: Mood = "calm";
+  raging = false;
 
-  get raging(): boolean {
-    return this.rage !== undefined;
+  private syncFlags(): void {
+    this.mood = this.emo.mood;
+    this.raging = this.rage !== undefined;
   }
 
   roll(): number {
@@ -311,6 +312,7 @@ export class AIDriver implements DriverView {
     this.speechCooldown -= dt;
     this.updateHornAndFlash(dt);
     this.emo.update(dt, ctx.time, this.congestion());
+    this.syncFlags();
     v.lights.dark = ctx.env.dark;
     if (v.wrecked) {
       this.state = "crashed";
@@ -341,6 +343,7 @@ export class AIDriver implements DriverView {
     this.detectOffenses(dt, ctx);
     this.checkEmergencyBehind(dt, ctx);
     this.updateRage(dt, ctx);
+    this.syncFlags();
     if (v.mode !== "lane") return; // rage may have switched us to physics
 
     // --- Parameters shaped by mood, weather and situation.
@@ -830,7 +833,7 @@ export class AIDriver implements DriverView {
     const hc = Math.cos(v.heading);
     const hs = Math.sin(v.heading);
     for (const e of ctx.vehicles) {
-      if (!e.sirenOn || e === v || !e.alive) continue;
+      if (!e.sirenOn() || e === v || !e.alive) continue;
       const dx = e.x - v.x;
       const dy = e.y - v.y;
       const d2 = dx * dx + dy * dy;
@@ -888,21 +891,16 @@ export class AIDriver implements DriverView {
     rage.cooldown -= dt;
     if (rage.brakeCheck > 0) rage.brakeCheck -= dt;
     const tgt = ctx.vehicle(rage.target);
-    const end = (reason: string) => {
-      this.rage = undefined;
-      ctx.events.emit({ type: "rage_end", vehicle: v.id, reason });
-      if (this.state === "chasing") this.state = "recovering";
-    };
-    if (tgt === undefined || !tgt.alive) return end("target gone");
+    if (tgt === undefined || !tgt.alive) return this.endRage(ctx, "target gone");
     const dist = Math.sqrt((tgt.x - v.x) * (tgt.x - v.x) + (tgt.y - v.y) * (tgt.y - v.y));
     if (dist > 120) rage.lostTime += dt;
     else rage.lostTime = 0;
-    if (rage.lostTime > 6) return end("lost target");
-    if (emo.anger < 35) return end("calmed down");
-    if (rage.time > 50) return end("gave up");
+    if (rage.lostTime > 6) return this.endRage(ctx, "lost target");
+    if (emo.anger < 35) return this.endRage(ctx, "calmed down");
+    if (rage.time > 50) return this.endRage(ctx, "gave up");
     if (ctx.policeNear(v.x, v.y, 50).length > 0) {
       emo.anger = Math.min(emo.anger, 40);
-      return end("police nearby");
+      return this.endRage(ctx, "police nearby");
     }
     const tgtDriver = ctx.driverOf(tgt);
     const targetBehindMe = tgtDriver !== undefined ? tgtDriver.leader.id === v.id && tgtDriver.leader.gap < 18 : this.isBehind(tgt) && dist < 18;
@@ -924,6 +922,13 @@ export class AIDriver implements DriverView {
       }
       if (!targetBehindMe && rage.cooldown <= 0) rage.behavior = "tailgate";
     }
+  }
+
+  private endRage(ctx: SimContext, reason: string): void {
+    this.rage = undefined;
+    this.raging = false;
+    ctx.events.emit({ type: "rage_end", vehicle: this.v.id, reason });
+    if (this.state === "chasing") this.state = "recovering";
   }
 
   private isBehind(o: Vehicle): boolean {
@@ -967,7 +972,7 @@ export class AIDriver implements DriverView {
         brakeToStop(v, true);
         if (v.physicsTime > 1) lights.hazard = true;
         if (v.wrecked) return;
-        if (v.absSpeed < 0.5) this.crashTimer -= dt;
+        if (v.absSpeed() < 0.5) this.crashTimer -= dt;
         if (this.crashTimer <= 0) {
           if (this.emo.canRage() && this.emo.target >= 0 && this.rage === undefined) {
             this.updateRage(dt, ctx);
@@ -995,10 +1000,10 @@ export class AIDriver implements DriverView {
         }
         // Aim slightly ahead of the target; ramming means aiming at its flank.
         const lead = rage.behavior === "ram" ? 0.35 : 0.8;
-        const tx = tgt.x + tgt.vx * lead;
-        const ty = tgt.y + tgt.vy * lead;
+        const tx = tgt.x + tgt.vx() * lead;
+        const ty = tgt.y + tgt.vy() * lead;
         const dist = Math.sqrt((tx - v.x) * (tx - v.x) + (ty - v.y) * (ty - v.y));
-        const tSpeed = tgt.absSpeed;
+        const tSpeed = tgt.absSpeed();
         const want = rage.behavior === "ram" ? tSpeed + 6 : dist > 20 ? tSpeed + 8 : tSpeed;
         driveToward(v, tx, ty, clamp(want, 6, 40), true);
         if (this.rng.chance(dt * 0.6)) this.honk(ctx, true);
@@ -1071,7 +1076,7 @@ export class AIDriver implements DriverView {
     const dx = tgt.x - v.x;
     const dy = tgt.y - v.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const tSpeed = tgt.absSpeed;
+    const tSpeed = tgt.absSpeed();
     const gapErr = dist - this.followGap;
     let want = tSpeed + clamp(gapErr * 0.6, -tSpeed - 5, 25);
     if (this.followGap < 2) want = tSpeed + 10; // ram/PIT
@@ -1081,8 +1086,8 @@ export class AIDriver implements DriverView {
     }
     // Aim behind the target when following, at it when pursuing.
     const back = this.followGap > 2 ? 0 : -0.5;
-    const ax = tgt.x - Math.cos(tgt.heading) * back + tgt.vx * 0.4;
-    const ay = tgt.y - Math.sin(tgt.heading) * back + tgt.vy * 0.4;
+    const ax = tgt.x - Math.cos(tgt.heading) * back + tgt.vx() * 0.4;
+    const ay = tgt.y - Math.sin(tgt.heading) * back + tgt.vy() * 0.4;
     driveToward(v, ax, ay, clamp(want, 0, 55), true);
     void dt;
     void ctx;

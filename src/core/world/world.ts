@@ -14,7 +14,7 @@ import { buildCity, City, CityOptions } from "../road/cityBuilder";
 import { addOccupant, Connector, Lane, LaneHit, Network } from "../road/network";
 import { Router } from "../road/router";
 import { Segment } from "../road/types";
-import { SignalController } from "../signals/signalController";
+import { DemandFn, SignalController } from "../signals/signalController";
 import { EventBus } from "../util/events";
 import { SpatialHash } from "../util/spatialHash";
 import { SPECS, VehicleClass } from "../vehicle/specs";
@@ -98,6 +98,19 @@ export class World implements SimContext {
   private playerTailgate: Map<number, number> = new Map();
   private nearMissMemo: Map<number, number> = new Map();
   private nightFlashing = false;
+  private cleanupTimer = 0;
+  /** Detector demand for actuated signals (created once: no per-step closures). */
+  private readonly demandFn: DemandFn = (c: Connector): number => {
+    const lane = c.from;
+    let n = 0;
+    for (let i = 0; i < lane.occCount; i++) {
+      const e = lane.occ[i];
+      if (e.s < lane.length - 60) continue;
+      if (e.occ.intentConnector === c.id || (e.phantom && e.occ.intentConnector === -1)) n++;
+    }
+    for (let i = 0; i < c.occCount; i++) if (c.occ[i].v < 2) n++;
+    return n;
+  };
 
   constructor(opts: WorldOptions = {}) {
     const seed = opts.seed ?? 2077;
@@ -367,7 +380,7 @@ export class World implements SimContext {
   }
 
   /** Interpolation alpha between the last two steps (for smooth rendering). */
-  get alpha(): number {
+  alpha(): number {
     return this.accumulator / this.fixedDt;
   }
 
@@ -393,7 +406,10 @@ export class World implements SimContext {
     this.lawAndOrder(dt);
     this.ambulances(dt);
     this.spawner.update(dt, this.env.trafficDensity);
-    // Stale all-way stop arrivals.
+    // Stale all-way stop arrivals (every 2 s).
+    this.cleanupTimer -= dt;
+    if (this.cleanupTimer > 0) return;
+    this.cleanupTimer = 2;
     this.allWayQueues.forEach((q) => {
       q.arrivals.forEach((t, id) => {
         if (this.time - t > 60 || !this.byId.has(id)) q.arrivals.delete(id);
@@ -411,18 +427,7 @@ export class World implements SimContext {
         if (minor) s.setMode(flash ? "flashing" : "actuated");
       }
     }
-    const demand = (c: Connector): number => {
-      const lane = c.from;
-      let n = 0;
-      for (let i = 0; i < lane.occCount; i++) {
-        const e = lane.occ[i];
-        if (e.s < lane.length - 60) continue;
-        if (e.occ.intentConnector === c.id || (e.phantom && e.occ.intentConnector === -1)) n++;
-      }
-      for (let i = 0; i < c.occCount; i++) if (c.occ[i].v < 2) n++;
-      return n;
-    };
-    for (const s of this.signals) s.update(dt, demand);
+    for (const s of this.signals) s.update(dt, this.demandFn);
   }
 
   /** Register every vehicle on the segments it occupies (lanes, connectors, shadows). */
@@ -463,7 +468,7 @@ export class World implements SimContext {
       const halfAcross = v.halfWid * (1 - rel) + v.halfLen * rel;
       if (Math.abs(h.lateral) > h.lane.width / 2 + halfAcross - 0.3) continue;
       if (h.s < -v.halfLen || h.s > h.lane.length + v.halfLen) continue;
-      const vAlong = v.vx * Math.cos(lh) + v.vy * Math.sin(lh);
+      const vAlong = v.vx() * Math.cos(lh) + v.vy() * Math.sin(lh);
       addOccupant(h.lane, v, h.s, vAlong, true, h.lateral);
     }
     this.connHits = [];
@@ -474,7 +479,7 @@ export class World implements SimContext {
       if (pr.d2 > 2.6 * 2.6) continue;
       if (pr.s <= 0.01 && pr.d2 > 1) continue;
       const lh = c.path.headingAt(pr.s);
-      const vAlong = v.vx * Math.cos(lh) + v.vy * Math.sin(lh);
+      const vAlong = v.vx() * Math.cos(lh) + v.vy() * Math.sin(lh);
       addOccupant(c, v, pr.s, vAlong, true, pr.lateral);
     }
     void ch;
@@ -591,10 +596,10 @@ export class World implements SimContext {
       dyn.step(dt, v.inputs, torque, v.steerTarget, v.assists);
       v.syncFromDynamics();
       v.wheelSpin += dyn.drivenOmega() * dt;
-      v.odometer += dyn.speed * dt;
+      v.odometer += dyn.absSpeed() * dt;
       if (isPlayer) {
         v.lights.update(dt, dyn.steerAngle);
-        if (dyn.speed > 0.5) this.record.driveClean(dyn.speed * dt);
+        if (dyn.absSpeed() > 0.5) this.record.driveClean(dyn.absSpeed() * dt);
       }
     }
     // Lane-mode rpm estimates for audio.
@@ -640,7 +645,7 @@ export class World implements SimContext {
   }
 
   private resolveVehicles(a: Vehicle, b: Vehicle): void {
-    const vn = (b.vx - a.vx) * contact.nx + (b.vy - a.vy) * contact.ny;
+    const vn = (b.vx() - a.vx()) * contact.nx + (b.vy() - a.vy()) * contact.ny;
     const closing = -vn;
     const bothLane = a.mode === "lane" && b.mode === "lane";
     if (bothLane && closing < 2.0) return;
@@ -663,8 +668,8 @@ export class World implements SimContext {
     if (aWasLane) a.enterPhysics();
     if (bWasLane) b.enterPhysics();
     // Fault: who drove into whom.
-    const aInto = a.vx * contact.nx + a.vy * contact.ny;
-    const bInto = -(b.vx * contact.nx + b.vy * contact.ny);
+    const aInto = a.vx() * contact.nx + a.vy() * contact.ny;
+    const bInto = -(b.vx() * contact.nx + b.vy() * contact.ny);
     const atFault = aInto >= bInto ? a : b;
     const j = resolveBodies(a.dyn, b.dyn, contact, 0.15, 0.4);
     a.syncFromDynamics();
@@ -739,8 +744,8 @@ export class World implements SimContext {
         }
         if (v.damage.front < 0.15) v.pt.health = 0;
       }
-      v.dyn.tireHealth = Math.min(v.dyn.tireHealth, 0.5 + v.damage.body * 0.5);
-      if (v.damage.totaled && !v.wrecked) {
+      v.dyn.tireHealth = Math.min(v.dyn.tireHealth, 0.5 + v.damage.body() * 0.5);
+      if (v.damage.totaled() && !v.wrecked) {
         v.wrecked = true;
         v.lights.hazard = !v.isPlayer;
         if (v.isPlayer) this.events.emit({ type: "info", text: "Your vehicle is wrecked. Press ` to reset." });
@@ -760,7 +765,7 @@ export class World implements SimContext {
     h.lane.path.sample(s, pt);
     p.dyn.reset(pt.x, pt.y, pt.heading, 0);
     p.syncFromDynamics();
-    const cost = Math.floor((1 - p.damage.body) * 1500 + (1 - p.pt.health) * 800);
+    const cost = Math.floor((1 - p.damage.body()) * 1500 + (1 - p.pt.health) * 800);
     if (cost > 0) {
       this.record.money -= cost;
       this.events.emit({ type: "info", text: `Vehicle repaired: -€$${cost}` });
@@ -815,7 +820,7 @@ export class World implements SimContext {
   private playerSocial(dt: number, p: Vehicle): void {
     const info = this.monitor.info;
     const lane = info.lane;
-    if (lane !== undefined && info.headway < 0.7 && p.absSpeed > 6 && info.leaderGap < 20) {
+    if (lane !== undefined && info.headway < 0.7 && p.absSpeed() > 6 && info.leaderGap < 20) {
       // Find the car ahead in our lane.
       let leader: Vehicle | undefined = undefined;
       let best = Infinity;
@@ -837,13 +842,13 @@ export class World implements SimContext {
       }
     } else this.playerTailgate = new Map();
     // Near misses: fast passes within a metre or two.
-    if (p.absSpeed > 8) {
+    if (p.absSpeed() > 8) {
       this.queryBuf = [];
       this.vehicleHash.query(p.x, p.y, 6, this.queryBuf);
       for (const v of this.queryBuf) {
         if (v === p) continue;
         const d = hypot(v.x - p.x, v.y - p.y) - (v.halfWid + p.halfWid);
-        const rel = hypot(v.vx - p.vx, v.vy - p.vy);
+        const rel = hypot(v.vx() - p.vx(), v.vy() - p.vy());
         if (d < 1.2 && rel > 7) {
           const last = this.nearMissMemo.get(v.id) ?? -10;
           if (this.time - last < 3) continue;

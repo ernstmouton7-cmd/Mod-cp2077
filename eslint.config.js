@@ -28,6 +28,7 @@ export default tseslint.config(
         { selector: "BinaryExpression[operator='%']", message: "Use mod()/fmod() from math/scalar: % differs between JS and Lua for negatives." },
         { selector: "UnaryExpression[operator='delete']", message: "delete is not portable to Lua arrays." },
         { selector: "BinaryExpression[operator=/^(<<|>>|>>>|&|\\||\\^)$/]", message: "Bitwise ops are not portable to LuaJIT/5.1 without bit lib." },
+        { selector: "MethodDefinition[kind='get'], MethodDefinition[kind='set']", message: "No accessors in src/core: TypeScriptToLua turns them into a slow __index function for the whole class." },
       ],
       "no-restricted-globals": ["error", "window", "document", "console", "performance", "setTimeout", "setInterval", "requestAnimationFrame"],
     },

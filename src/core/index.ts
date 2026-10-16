@@ -37,3 +37,10 @@ export { Rng } from "./math/rng";
 export { EventBus } from "./util/events";
 
 export const VERSION = "0.1.0";
+
+import { World as WorldClass, WorldOptions as Opts } from "./world/world";
+
+/** Factory for hosts that cannot use `new` (plain Lua: core.createWorld({ seed = 1 })). */
+export function createWorld(opts?: Opts): WorldClass {
+  return new WorldClass(opts ?? {});
+}

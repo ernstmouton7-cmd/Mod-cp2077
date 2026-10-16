@@ -11,7 +11,7 @@
     "outDir": "build/lua"
   },
   "tstl": {
-    "luaTarget": "JIT",
+    "luaTarget": "5.1",
     "luaBundle": "gridlock_core.lua",
     "luaBundleEntry": "src/core/index.ts",
     "noImplicitSelf": true,

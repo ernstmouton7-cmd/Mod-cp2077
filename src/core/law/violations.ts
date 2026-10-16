@@ -87,7 +87,7 @@ export class DrivingRecord {
   totalFines = 0;
   private lastCharged: Map<ViolationKind, number> = new Map();
 
-  get suspended(): boolean {
+  suspended(): boolean {
     return this.points >= this.maxPoints;
   }
 

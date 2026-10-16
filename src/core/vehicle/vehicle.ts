@@ -58,6 +58,7 @@ export class Vehicle implements Occupant {
   readonly lights: VehicleLights;
   readonly damage = new DamageModel();
 
+  readonly isPlayer: boolean;
   alive = true;
   /** Disabled by damage: no engine, hazards on. */
   wrecked = false;
@@ -90,32 +91,30 @@ export class Vehicle implements Occupant {
     this.dyn = new VehicleDynamics(spec);
     this.pt = new Powertrain(spec);
     this.lights = new VehicleLights(id);
+    this.isPlayer = role === "player";
     if (spec.emergency) this.assists.esc = true;
   }
 
-  get isPlayer(): boolean {
-    return this.role === "player";
-  }
 
-  get isEmergency(): boolean {
+  isEmergency(): boolean {
     return this.role === "police" || this.role === "ambulance";
   }
 
-  get sirenOn(): boolean {
+  sirenOn(): boolean {
     return this.lights.siren !== "off";
   }
 
-  get absSpeed(): number {
-    return this.mode === "physics" ? this.dyn.speed : Math.abs(this.speed);
+  absSpeed(): number {
+    return this.mode === "physics" ? this.dyn.absSpeed() : Math.abs(this.speed);
   }
 
   /** World velocity. */
-  get vx(): number {
-    return this.mode === "physics" ? this.dyn.vx : Math.cos(this.heading) * this.speed;
+  vx(): number {
+    return this.mode === "physics" ? this.dyn.vx() : Math.cos(this.heading) * this.speed;
   }
 
-  get vy(): number {
-    return this.mode === "physics" ? this.dyn.vy : Math.sin(this.heading) * this.speed;
+  vy(): number {
+    return this.mode === "physics" ? this.dyn.vy() : Math.sin(this.heading) * this.speed;
   }
 
   /** Place on a segment in lane mode. */

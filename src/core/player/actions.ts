@@ -214,7 +214,10 @@ export class InputMapper {
   /** Feed a gamepad state (standard mapping). */
   gamepad(buttons: ReadonlyArray<number>, axes: ReadonlyArray<number>): void {
     let any = false;
-    this.bindings.forEach((b, id) => {
+    for (const def of ACTIONS) {
+      const id = def.id;
+      const b = this.bindings.get(id);
+      if (b === undefined) continue;
       let v = 0;
       for (const p of b.pad) {
         if (p.button !== undefined && p.button < buttons.length) v = Math.max(v, buttons[p.button]);
@@ -228,7 +231,7 @@ export class InputMapper {
       if (v > 0.5 && before <= 0.5) this.pendingPress.push(id);
       if (v > 0.05) any = true;
       this.padValues.set(id, v);
-    });
+    }
     if (any) this.analogFromPad = true;
   }
 

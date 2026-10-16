@@ -1,6 +1,10 @@
 import { clamp, mod, smoothstep } from "../math/scalar";
 import { Rng } from "../math/rng";
 
+function bell(h: number, c: number, w: number): number {
+  return Math.exp(-((h - c) * (h - c)) / (2 * w * w));
+}
+
 export type Weather = "clear" | "cloudy" | "rain" | "storm" | "fog";
 
 /** Time of day and weather, with their effects on driving. */
@@ -23,39 +27,31 @@ export class Environment {
   constructor(seed: number, startHour: number) {
     this.hour = startHour;
     this.rng = new Rng(seed);
+    this.refresh();
   }
 
+  /** Derived values, refreshed by refresh() (plain fields keep Lua fast). */
   /** 0 (night) .. 1 (day). */
-  get daylight(): number {
-    const h = this.hour;
-    return smoothstep(5.5, 7.5, h) * (1 - smoothstep(18.5, 20.5, h));
-  }
-
-  get dark(): boolean {
-    return this.daylight < 0.45 || this.fog > 0.6;
-  }
-
+  daylight = 1;
+  dark = false;
   /** Tyre grip multiplier from road wetness. */
-  get grip(): number {
-    return 1 - 0.32 * this.wetness;
-  }
-
+  grip = 1;
   /** Visibility (m) for AI caution and HUD. */
-  get visibility(): number {
-    const night = 1 - this.daylight;
-    return clamp(1200 * (1 - this.fog * 0.9) * (1 - this.rain * 0.5) * (1 - night * 0.4), 40, 1200);
-  }
-
+  visibility = 1200;
   /** Traffic demand multiplier by hour (rush hours peak). */
-  get trafficDensity(): number {
-    const h = this.hour;
-    const bell = (c: number, w: number) => Math.exp(-((h - c) * (h - c)) / (2 * w * w));
-    return clamp(0.25 + 0.75 * bell(8.2, 1.4) + 0.85 * bell(17.6, 1.7) + 0.45 * bell(13, 2.5) + 0.25 * bell(21.5, 1.5), 0.2, 1.1);
-  }
-
+  trafficDensity = 1;
   /** Late night: some signals switch to flashing operation. */
-  get nightFlash(): boolean {
-    return this.hour >= 1 && this.hour < 5;
+  nightFlash = false;
+
+  refresh(): void {
+    const h = this.hour;
+    this.daylight = smoothstep(5.5, 7.5, h) * (1 - smoothstep(18.5, 20.5, h));
+    this.dark = this.daylight < 0.45 || this.fog > 0.6;
+    this.grip = 1 - 0.32 * this.wetness;
+    const night = 1 - this.daylight;
+    this.visibility = clamp(1200 * (1 - this.fog * 0.9) * (1 - this.rain * 0.5) * (1 - night * 0.4), 40, 1200);
+    this.trafficDensity = clamp(0.25 + 0.75 * bell(h, 8.2, 1.4) + 0.85 * bell(h, 17.6, 1.7) + 0.45 * bell(h, 13, 2.5) + 0.25 * bell(h, 21.5, 1.5), 0.2, 1.1);
+    this.nightFlash = h >= 1 && h < 5;
   }
 
   setWeather(w: Weather): void {
@@ -84,5 +80,6 @@ export class Environment {
     this.fog += (targetFog - this.fog) * Math.min(1, dt * 0.05);
     const wetTarget = this.rain > 0.05 ? Math.min(1, this.rain * 1.5) : 0;
     this.wetness += (wetTarget - this.wetness) * Math.min(1, dt * (wetTarget > this.wetness ? 0.08 : 0.01));
+    this.refresh();
   }
 }

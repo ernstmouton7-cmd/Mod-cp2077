@@ -10,14 +10,14 @@ export interface SpawnHost {
   readonly rng: Rng;
   readonly vehicles: Vehicle[];
   readonly lanes: Lane[];
-  playerPos(): { x: number; y: number } | undefined;
-  add(v: Vehicle, d: AIDriver): void;
-  remove(v: Vehicle): void;
-  nextId(): number;
-  driverOf(v: Vehicle): AIDriver | undefined;
+  readonly playerPos: (this: void) => { x: number; y: number } | undefined;
+  readonly add: (this: void, v: Vehicle, d: AIDriver) => void;
+  readonly remove: (this: void, v: Vehicle) => void;
+  readonly nextId: (this: void) => number;
+  readonly driverOf: (this: void, v: Vehicle) => AIDriver | undefined;
   /** Is a lane position free of other vehicles within `clear` metres? */
-  laneFree(lane: Lane, s: number, clear: number): boolean;
-  busyUnit(v: Vehicle): boolean;
+  readonly laneFree: (this: void, lane: Lane, s: number, clear: number) => boolean;
+  readonly busyUnit: (this: void, v: Vehicle) => boolean;
 }
 
 export interface PopulationOptions {
@@ -132,12 +132,12 @@ export class Spawner {
       const spot = this.findSpot(this.opts.minDistance, Infinity);
       if (spot !== undefined) this.create(this.pickClass(), "civilian", spot.lane, spot.s, spot.lane.speedLimit * 0.7);
     } else if (civ > target * 1.15 + 2) {
+      let surplus: Vehicle | undefined = undefined;
       for (const v of h.vehicles) {
-        if (v.role !== "civilian" || v.mode !== "lane") continue;
-        if (pp !== undefined && (v.x - pp.x) * (v.x - pp.x) + (v.y - pp.y) * (v.y - pp.y) < 150 * 150) continue;
-        h.remove(v);
-        break;
+        const near = pp !== undefined && (v.x - pp.x) * (v.x - pp.x) + (v.y - pp.y) * (v.y - pp.y) < 150 * 150;
+        if (surplus === undefined && v.role === "civilian" && v.mode === "lane" && !near) surplus = v;
       }
+      if (surplus !== undefined) h.remove(surplus);
     }
     if (police < this.opts.police) {
       const spot = this.findSpot(this.opts.minDistance, Infinity);
