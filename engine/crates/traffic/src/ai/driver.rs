@@ -3,7 +3,9 @@
 use super::control::{brake_to_stop, drive_toward};
 use super::emotion::{Emotion, Mood, OffenseKind};
 use super::idm::{idm_accel, idm_free, IdmParams};
-use super::intersection::{approach_stop_distance, connector_stop_distance, pedestrian_stop_distance, JunctionState};
+use super::intersection::{
+    approach_stop_distance, connector_stop_distance, pedestrian_stop_distance, JunctionState,
+};
 use super::personality::{Archetype, Personality};
 use super::speech::line_for;
 use crate::ids::{ConnectorId, LaneId, RoadId, SegRef, VehicleId};
@@ -66,7 +68,14 @@ pub struct Leader {
 
 impl Default for Leader {
     fn default() -> Self {
-        Leader { id: None, gap: f64::INFINITY, speed: 0.0, phantom: false, seg: None, s: 0.0 }
+        Leader {
+            id: None,
+            gap: f64::INFINITY,
+            speed: 0.0,
+            phantom: false,
+            seg: None,
+            s: 0.0,
+        }
     }
 }
 
@@ -206,8 +215,20 @@ impl AIDriver {
             raging: false,
             signal_decided: None,
             will_signal: true,
-            params: IdmParams { v0: 10.0, t: 1.4, a: 1.5, b: 2.0, s0: 2.0 },
-            stop_params: IdmParams { v0: 10.0, t: 0.2, a: 1.5, b: 2.0, s0: 0.6 },
+            params: IdmParams {
+                v0: 10.0,
+                t: 1.4,
+                a: 1.5,
+                b: 2.0,
+                s0: 2.0,
+            },
+            stop_params: IdmParams {
+                v0: 10.0,
+                t: 0.2,
+                a: 1.5,
+                b: 2.0,
+                s0: 0.6,
+            },
         }
     }
 
@@ -240,7 +261,12 @@ impl AIDriver {
             .into();
         }
         if self.hold_time > 0.0 {
-            return if self.hold_kind == Some(HoldKind::Bus) { "bus stop" } else { "broken down" }.into();
+            return if self.hold_kind == Some(HoldKind::Bus) {
+                "bus stop"
+            } else {
+                "broken down"
+            }
+            .into();
         }
         if self.passing.is_some() {
             return "overtaking".into();
@@ -299,12 +325,23 @@ impl AIDriver {
     }
 
     /// Route to a specific road (police dispatch, ambulances).
-    pub fn route_to(&mut self, net: &Network, router: &Router, cur: Option<SegRef>, road: RoadId, forward: bool) -> bool {
-        let Some(lane) = current_lane(net, cur) else { return false };
+    pub fn route_to(
+        &mut self,
+        net: &Network,
+        router: &Router,
+        cur: Option<SegRef>,
+        road: RoadId,
+        forward: bool,
+    ) -> bool {
+        let Some(lane) = current_lane(net, cur) else {
+            return false;
+        };
         if net.lane(lane).road == road {
             return true;
         }
-        let Some(r) = router.route(net, lane, road, forward) else { return false };
+        let Some(r) = router.route(net, lane, road, forward) else {
+            return false;
+        };
         self.route = r;
         self.ri = 0;
         self.next = self.connector_from(net, lane);
@@ -326,13 +363,23 @@ impl AIDriver {
         if step.is_none() {
             return Some(l.outgoing[self.rng.index(l.outgoing.len())]);
         }
-        l.outgoing.iter().copied().find(|&c| net.connector(c).turn == TurnType::Straight).or(Some(l.outgoing[0]))
+        l.outgoing
+            .iter()
+            .copied()
+            .find(|&c| net.connector(c).turn == TurnType::Straight)
+            .or(Some(l.outgoing[0]))
     }
 
     /// Lanes of the current road that lead where the route goes.
     fn route_lanes(&self, net: &Network, lane: LaneId) -> Vec<LaneId> {
-        let Some(step) = self.next_road(self.ri) else { return Vec::new() };
-        net.siblings(lane).iter().copied().filter(|&l| net.connector_to(l, step.road).is_some()).collect()
+        let Some(step) = self.next_road(self.ri) else {
+            return Vec::new();
+        };
+        net.siblings(lane)
+            .iter()
+            .copied()
+            .filter(|&l| net.connector_to(l, step.road).is_some())
+            .collect()
     }
 
     // ------------------------------------------------------------- perception
@@ -419,7 +466,12 @@ impl AIDriver {
                     let c = if depth == 0 {
                         next_conn
                     } else if !net.lane(lid).outgoing.is_empty() {
-                        self.peek_connector(net, lid, depth, v.seg.is_some_and(|s| s.is_connector()))
+                        self.peek_connector(
+                            net,
+                            lid,
+                            depth,
+                            v.seg.is_some_and(|s| s.is_connector()),
+                        )
                     } else {
                         None
                     };
@@ -433,7 +485,13 @@ impl AIDriver {
         self.leader = l;
     }
 
-    fn peek_connector(&self, net: &Network, lane: LaneId, depth: usize, on_connector: bool) -> Option<ConnectorId> {
+    fn peek_connector(
+        &self,
+        net: &Network,
+        lane: LaneId,
+        depth: usize,
+        on_connector: bool,
+    ) -> Option<ConnectorId> {
         let idx = self.ri + if on_connector { 0 } else { 1 } + (depth - 1) / 2;
         if let Some(step) = self.next_road(idx) {
             if let Some(c) = net.connector_to(lane, step.road) {
@@ -441,7 +499,11 @@ impl AIDriver {
             }
         }
         let l = net.lane(lane);
-        l.outgoing.iter().copied().find(|&c| net.connector(c).turn == TurnType::Straight).or(l.outgoing.first().copied())
+        l.outgoing
+            .iter()
+            .copied()
+            .find(|&c| net.connector(c).turn == TurnType::Straight)
+            .or(l.outgoing.first().copied())
     }
 
     // ----------------------------------------------------------------- update
@@ -472,11 +534,14 @@ impl AIDriver {
     fn congestion(&self, sim: &Sim, vi: usize) -> f64 {
         let v = &sim.vehicles[vi];
         let lim = v.seg.map_or(10.0, |s| sim.net.seg_speed_limit(s));
-        clamp(1.0 - v.speed / lim.max(1.0), 0.0, 1.0) * if self.leader.gap < 15.0 { 1.0 } else { 0.3 }
+        clamp(1.0 - v.speed / lim.max(1.0), 0.0, 1.0)
+            * if self.leader.gap < 15.0 { 1.0 } else { 0.3 }
     }
 
     fn lane_update(&mut self, dt: f64, sim: &mut Sim, vi: usize) {
-        let Some(seg) = sim.vehicles[vi].seg else { return };
+        let Some(seg) = sim.vehicles[vi].seg else {
+            return;
+        };
         let p = self.p;
 
         if let SegRef::Lane(l) = seg {
@@ -541,7 +606,12 @@ impl AIDriver {
         // --- Car following.
         let mut acc = idm_free(v_speed, &self.params);
         if self.leader.gap < f64::INFINITY {
-            acc = idm_accel(v_speed, self.leader.gap, v_speed - self.leader.speed, &self.params);
+            acc = idm_accel(
+                v_speed,
+                self.leader.gap,
+                v_speed - self.leader.speed,
+                &self.params,
+            );
         }
 
         // --- Curves: slow for the next connector's comfortable speed.
@@ -586,11 +656,15 @@ impl AIDriver {
             (SegRef::Lane(_), Some(nc)) => {
                 let to_line = seg_len - v_s - v_half_len;
                 if to_line < 50.0 {
-                    self.stop_dist = self.stop_dist.min(pedestrian_stop_distance(sim, vi, nc, to_line, 0.0));
+                    self.stop_dist = self
+                        .stop_dist
+                        .min(pedestrian_stop_distance(sim, vi, nc, to_line, 0.0));
                 }
             }
             (SegRef::Connector(c), _) => {
-                self.stop_dist = self.stop_dist.min(pedestrian_stop_distance(sim, vi, c, 0.0, v_s + v_half_len));
+                self.stop_dist =
+                    self.stop_dist
+                        .min(pedestrian_stop_distance(sim, vi, c, 0.0, v_s + v_half_len));
             }
             _ => {}
         }
@@ -602,14 +676,24 @@ impl AIDriver {
             self.stop_params.a = self.params.a;
             self.stop_params.b = self.params.b;
             self.stop_params.v0 = self.params.v0;
-            acc = acc.min(idm_accel(v_speed, self.stop_dist, v_speed, &self.stop_params));
+            acc = acc.min(idm_accel(
+                v_speed,
+                self.stop_dist,
+                v_speed,
+                &self.stop_params,
+            ));
         }
 
         // --- Bus stops mid-block on the curb lane.
         if v_spec.id == VehicleClass::Bus && self.hold_time <= 0.0 {
             if let SegRef::Lane(l) = seg {
                 let lane = sim.net.lane(l);
-                if lane.right.is_none() && lane.length > 60.0 && self.bus_stop_lane != Some(l) && v_s > lane.length * 0.45 && v_s < lane.length * 0.6 {
+                if lane.right.is_none()
+                    && lane.length > 60.0
+                    && self.bus_stop_lane != Some(l)
+                    && v_s > lane.length * 0.45
+                    && v_s < lane.length * 0.6
+                {
                     self.bus_stop_lane = Some(l);
                     if self.rng.chance(0.7) {
                         let secs = self.rng.range(7.0, 14.0);
@@ -620,7 +704,11 @@ impl AIDriver {
         }
         // --- Holds: brake gently to the curb, then wait.
         if self.hold_time > 0.0 {
-            acc = acc.min(if v_speed > 0.3 { -(0.8 + v_speed * 0.25).min(3.0) } else { -1.0 });
+            acc = acc.min(if v_speed > 0.3 {
+                -(0.8 + v_speed * 0.25).min(3.0)
+            } else {
+                -1.0
+            });
             if v_speed < 0.3 {
                 self.hold_time -= dt;
             }
@@ -642,7 +730,13 @@ impl AIDriver {
         }
         if self.depart_signal > 0.0 {
             self.depart_signal -= dt;
-            sim.vehicles[vi].lights.set_indicator(if self.depart_signal > 0.0 { Indicator::Left } else { Indicator::Off });
+            sim.vehicles[vi]
+                .lights
+                .set_indicator(if self.depart_signal > 0.0 {
+                    Indicator::Left
+                } else {
+                    Indicator::Off
+                });
         }
         // --- Overtake stopped vehicles through the oncoming lane.
         if let SegRef::Lane(l) = seg {
@@ -744,7 +838,11 @@ impl AIDriver {
                 }
             };
             let aborting = vlat.abs() < 1.2 && !Self::oncoming_clear(sim, vi, passing, 45.0);
-            if clear_of_it || aborting || lane_len - vs < 12.0 || sim.net.lane(passing).road != sim.net.lane(lane).road {
+            if clear_of_it
+                || aborting
+                || lane_len - vs < 12.0
+                || sim.net.lane(passing).road != sim.net.lane(lane).road
+            {
                 self.passing = None;
                 self.pass_wait = 0.0;
             }
@@ -756,11 +854,17 @@ impl AIDriver {
             self.pass_wait = 0.0;
             return;
         };
-        if l.gap > 14.0 || l.speed > 0.3 || sim.net.lane(lane).left.is_some() || l.seg != Some(SegRef::Lane(lane)) {
+        if l.gap > 14.0
+            || l.speed > 0.3
+            || sim.net.lane(lane).left.is_some()
+            || l.seg != Some(SegRef::Lane(lane))
+        {
             self.pass_wait = 0.0;
             return;
         }
-        let stuck = lead.wrecked || lead.mode == MotionMode::Physics || lead.driver().is_some_and(|d| d.hold_time > 0.0);
+        let stuck = lead.wrecked
+            || lead.mode == MotionMode::Physics
+            || lead.driver().is_some_and(|d| d.hold_time > 0.0);
         let lead_id = lead.id;
         let opp = Self::opposite_lane(&sim.net, lane);
         let Some(opp) = opp.filter(|_| stuck && lane_len - vs >= 30.0) else {
@@ -779,7 +883,10 @@ impl AIDriver {
     }
 
     fn raging_through_lights(&self) -> bool {
-        self.rage.is_some_and(|r| r.behavior == RageBehavior::Tailgate || r.behavior == RageBehavior::Chase) && self.emo.anger > 85.0 && self.p.lawfulness < 0.3
+        self.rage.is_some_and(|r| {
+            r.behavior == RageBehavior::Tailgate || r.behavior == RageBehavior::Chase
+        }) && self.emo.anger > 85.0
+            && self.p.lawfulness < 0.3
     }
 
     fn human_factors(&mut self, dt: f64, mut acc: f64, speed: f64) -> f64 {
@@ -787,7 +894,8 @@ impl AIDriver {
         // Starting from standstill takes a reaction time (queue discharge wave).
         if speed < 0.15 && acc > 0.2 {
             self.react_timer += dt;
-            let reaction = lerp(1.4, 0.45, p.skill) + if self.distraction > 0.0 { 2.5 } else { 0.0 };
+            let reaction =
+                lerp(1.4, 0.45, p.skill) + if self.distraction > 0.0 { 2.5 } else { 0.0 };
             if self.react_timer < reaction {
                 acc = 0.0;
             }
@@ -804,8 +912,16 @@ impl AIDriver {
         }
         if self.distraction > 0.0 {
             self.distraction -= dt;
-            let ttc = if self.leader.gap < f64::INFINITY && speed > self.leader.speed { self.leader.gap / (speed - self.leader.speed) } else { f64::INFINITY };
-            let stop_ttc = if self.stop_dist < f64::INFINITY && speed > 0.5 { self.stop_dist / speed } else { f64::INFINITY };
+            let ttc = if self.leader.gap < f64::INFINITY && speed > self.leader.speed {
+                self.leader.gap / (speed - self.leader.speed)
+            } else {
+                f64::INFINITY
+            };
+            let stop_ttc = if self.stop_dist < f64::INFINITY && speed > 0.5 {
+                self.stop_dist / speed
+            } else {
+                f64::INFINITY
+            };
             if ttc < 1.3 || stop_ttc < 1.0 {
                 self.distraction = 0.0;
                 return acc.min(-8.0);
@@ -893,14 +1009,21 @@ impl AIDriver {
         let v = &mut sim.vehicles[vi];
         v.sync_lane_pose(net);
         if let Some(seg) = v.seg {
-            v.wheel_angle = clamp(net.seg_path(seg).curvature_at(v.s + 2.0, 2.0) * v.spec.wheelbase * 1.1 + v.lat_vel * 0.05, -0.6, 0.6);
+            v.wheel_angle = clamp(
+                net.seg_path(seg).curvature_at(v.s + 2.0, 2.0) * v.spec.wheelbase * 1.1
+                    + v.lat_vel * 0.05,
+                -0.6,
+                0.6,
+            );
         }
     }
 
     // ----------------------------------------------------------- lane changes
 
     fn lane_changes(&mut self, dt: f64, sim: &mut Sim, vi: usize) {
-        let Some(SegRef::Lane(lane)) = sim.vehicles[vi].seg else { return };
+        let Some(SegRef::Lane(lane)) = sim.vehicles[vi].seg else {
+            return;
+        };
         let (v_lat, v_s, v_speed) = {
             let v = &sim.vehicles[vi];
             (v.lat, v.s, v.speed)
@@ -917,7 +1040,9 @@ impl AIDriver {
             let signal_time = lerp(0.6, 2.2, self.p.signal_discipline);
             let urgency = clamp(1.0 - (to_end - 20.0) / 80.0, 0.0, 1.0);
             if self.lc_intent_time >= signal_time * (1.0 - urgency * 0.7) {
-                let b_safe = lerp(2.5, 5.0, self.p.aggression) + urgency * 3.0 + if self.raging { 2.0 } else { 0.0 };
+                let b_safe = lerp(2.5, 5.0, self.p.aggression)
+                    + urgency * 3.0
+                    + if self.raging { 2.0 } else { 0.0 };
                 if self.try_lane_change(sim, vi, lane, intent, b_safe) {
                     return;
                 }
@@ -939,7 +1064,11 @@ impl AIDriver {
         // Mandatory: get into a lane that has our turn.
         let good = self.route_lanes(&sim.net, lane);
         if !good.is_empty() && !good.contains(&lane) {
-            let dir = if sim.net.lane(good[0]).index < l_index { l_left } else { l_right };
+            let dir = if sim.net.lane(good[0]).index < l_index {
+                l_left
+            } else {
+                l_right
+            };
             if let Some(d) = dir {
                 self.intend(sim, vi, lane, d);
             }
@@ -956,14 +1085,25 @@ impl AIDriver {
         if v_speed < 1.0 && self.leader.gap > 8.0 {
             return;
         }
-        let a_old = if self.leader.gap < f64::INFINITY { idm_accel(v_speed, self.leader.gap, v_speed - self.leader.speed, &self.params) } else { idm_free(v_speed, &self.params) };
+        let a_old = if self.leader.gap < f64::INFINITY {
+            idm_accel(
+                v_speed,
+                self.leader.gap,
+                v_speed - self.leader.speed,
+                &self.params,
+            )
+        } else {
+            idm_free(v_speed, &self.params)
+        };
         let mut best = None;
         let mut best_gain = 0.0;
         for cand in [l_left, l_right].into_iter().flatten() {
             if !good.is_empty() && !good.contains(&cand) && to_end < 150.0 {
                 continue;
             }
-            let Some(g) = self.evaluate_lane(sim, vi, lane, cand) else { continue };
+            let Some(g) = self.evaluate_lane(sim, vi, lane, cand) else {
+                continue;
+            };
             let bias = if Some(cand) == l_right { 0.12 } else { -0.05 }; // keep-right rule
             let politeness = if self.raging { 0.0 } else { self.p.politeness };
             let gain = g.a_new - a_old + politeness * g.follower_delta + bias;
@@ -984,7 +1124,11 @@ impl AIDriver {
         let signals = self.rng.chance(self.p.signal_discipline);
         if signals {
             let left = sim.net.lane(lane).left == Some(target);
-            sim.vehicles[vi].lights.set_indicator(if left { Indicator::Left } else { Indicator::Right });
+            sim.vehicles[vi].lights.set_indicator(if left {
+                Indicator::Left
+            } else {
+                Indicator::Right
+            });
         }
     }
 
@@ -1026,7 +1170,9 @@ impl AIDriver {
         let gap_ahead = lead.map_or(f64::INFINITY, |l| l.0 - s_t - (l.2 + v.length) / 2.0);
         let gap_behind = fol.map_or(f64::INFINITY, |f| s_t - f.0 - (f.2 + v.length) / 2.0);
         let min_ahead = 2.5f64.max(v.speed * lerp(0.6, 0.3, self.p.aggression));
-        let min_behind = fol.map_or(0.0, |f| 2.0f64.max(f.1 * lerp(0.5, 0.25, self.p.aggression)));
+        let min_behind = fol.map_or(0.0, |f| {
+            2.0f64.max(f.1 * lerp(0.5, 0.25, self.p.aggression))
+        });
         if gap_ahead < min_ahead || gap_behind < min_behind {
             return None;
         }
@@ -1037,7 +1183,13 @@ impl AIDriver {
         let mut follower_delta = 0.0;
         let mut follower_acc = 0.0;
         if let Some(f) = fol {
-            let fp = IdmParams { v0: cl.speed_limit, t: 1.3, a: 1.5, b: 2.0, s0: 2.0 };
+            let fp = IdmParams {
+                v0: cl.speed_limit,
+                t: 1.3,
+                a: 1.5,
+                b: 2.0,
+                s0: 2.0,
+            };
             let before = match lead {
                 None => idm_free(f.1, &fp),
                 Some(l) => idm_accel(f.1, l.0 - f.0 - (l.2 + f.2) / 2.0, f.1 - l.1, &fp),
@@ -1045,10 +1197,22 @@ impl AIDriver {
             follower_acc = idm_accel(f.1, gap_behind, f.1 - v.speed, &fp);
             follower_delta = follower_acc - before;
         }
-        Some(LaneEval { a_new, follower_delta, follower_acc, follower: fol.map(|f| f.3) })
+        Some(LaneEval {
+            a_new,
+            follower_delta,
+            follower_acc,
+            follower: fol.map(|f| f.3),
+        })
     }
 
-    fn try_lane_change(&mut self, sim: &mut Sim, vi: usize, lane: LaneId, target: LaneId, b_safe: f64) -> bool {
+    fn try_lane_change(
+        &mut self,
+        sim: &mut Sim,
+        vi: usize,
+        lane: LaneId,
+        target: LaneId,
+        b_safe: f64,
+    ) -> bool {
         let (v_s, v_half_len, v_speed) = {
             let v = &sim.vehicles[vi];
             (v.s, v.half_len, v.speed)
@@ -1058,12 +1222,18 @@ impl AIDriver {
         if l.length - v_s - v_half_len < 10.0 && v_speed > 2.0 {
             return false;
         }
-        let Some(ev) = self.evaluate_lane(sim, vi, lane, target) else { return false };
+        let Some(ev) = self.evaluate_lane(sim, vi, lane, target) else {
+            return false;
+        };
         if ev.follower_acc < -b_safe {
             return false;
         }
         let tl = sim.net.lane(target);
-        let offset = if Some(target) == l.right { (l.width + tl.width) / 2.0 } else { -(l.width + tl.width) / 2.0 };
+        let offset = if Some(target) == l.right {
+            (l.width + tl.width) / 2.0
+        } else {
+            -(l.width + tl.width) / 2.0
+        };
         let s_t = (v_s * tl.length) / l.length;
         self.shadow_lane = Some(lane);
         let entry = {
@@ -1071,7 +1241,17 @@ impl AIDriver {
             v.seg = Some(SegRef::Lane(target));
             v.s = s_t;
             v.lat += offset;
-            OccEntry { vehicle: v.id, vi: vi as u32, s: s_t, v: v.speed, phantom: false, lat: v.lat, length: v.length, width: v.width, intent: v.intent_connector }
+            OccEntry {
+                vehicle: v.id,
+                vi: vi as u32,
+                s: s_t,
+                v: v.speed,
+                phantom: false,
+                lat: v.lat,
+                length: v.length,
+                width: v.width,
+                intent: v.intent_connector,
+            }
         };
         // Visible immediately to vehicles updated later this step.
         sim.occ.add(SegRef::Lane(target), entry);
@@ -1081,7 +1261,12 @@ impl AIDriver {
         // Forcing the new follower to brake hard is "cutting them off".
         if let Some(f) = ev.follower {
             if ev.follower_acc < -2.2 && sim.vehicle(f).is_some() {
-                sim.offend(self.vid, f, OffenseKind::CutOff, clamp(-ev.follower_acc / 3.0, 0.5, 2.0));
+                sim.offend(
+                    self.vid,
+                    f,
+                    OffenseKind::CutOff,
+                    clamp(-ev.follower_acc / 3.0, 0.5, 2.0),
+                );
             }
         }
         true
@@ -1103,7 +1288,13 @@ impl AIDriver {
             self.shadow_lane = None;
         }
         // Indicator off once the change is done (if no further intent).
-        if self.lc_intent.is_none() && v.lat.abs() < 0.2 && v.seg.is_some_and(|s| s.is_lane()) && turn_soon == Indicator::Off && v.lights.indicator != Indicator::Off && v.lights.indicator_time > 1.0 {
+        if self.lc_intent.is_none()
+            && v.lat.abs() < 0.2
+            && v.seg.is_some_and(|s| s.is_lane())
+            && turn_soon == Indicator::Off
+            && v.lights.indicator != Indicator::Off
+            && v.lights.indicator_time > 1.0
+        {
             v.lights.set_indicator(Indicator::Off);
         }
     }
@@ -1112,7 +1303,9 @@ impl AIDriver {
 
     fn turn_signal_wanted(&self, sim: &Sim, vi: usize) -> Indicator {
         let v = &sim.vehicles[vi];
-        let Some(seg) = v.seg else { return Indicator::Off };
+        let Some(seg) = v.seg else {
+            return Indicator::Off;
+        };
         let (c, dist) = match seg {
             SegRef::Lane(l) => (self.next, sim.net.lane(l).length - v.s),
             SegRef::Connector(c) => (Some(c), 0.0),
@@ -1133,10 +1326,18 @@ impl AIDriver {
         let dark = sim.env.dark;
         let v = &mut sim.vehicles[vi];
         let lights = &mut v.lights;
-        lights.brake = if self.last_accel < -0.6 || (v.speed < 0.2 && self.stop_dist < 20.0) || (v.speed < 0.2 && self.leader.gap < 8.0) { 1.0 } else { 0.0 };
+        lights.brake = if self.last_accel < -0.6
+            || (v.speed < 0.2 && self.stop_dist < 20.0)
+            || (v.speed < 0.2 && self.leader.gap < 8.0)
+        {
+            1.0
+        } else {
+            0.0
+        };
         lights.reverse = false;
         if self.state == DriverState::Drive && !v.wrecked {
-            lights.hazard = self.hold_kind == Some(HoldKind::Breakdown) || (self.yield_emergency > 0.0 && v.speed < 1.0 && self.p.lawfulness > 0.8);
+            lights.hazard = self.hold_kind == Some(HoldKind::Breakdown)
+                || (self.yield_emergency > 0.0 && v.speed < 1.0 && self.p.lawfulness > 0.8);
         }
         if self.lc_intent.is_none() {
             if self.signal_decided != v.seg {
@@ -1145,7 +1346,11 @@ impl AIDriver {
             }
             if want != Indicator::Off && self.will_signal {
                 lights.set_indicator(want);
-            } else if want == Indicator::Off && v.lat.abs() < 0.2 && lights.indicator_time > 1.5 && v.seg.is_some_and(|s| s.is_lane()) {
+            } else if want == Indicator::Off
+                && v.lat.abs() < 0.2
+                && lights.indicator_time > 1.5
+                && v.seg.is_some_and(|s| s.is_lane())
+            {
                 lights.set_indicator(Indicator::Off);
             }
         }
@@ -1158,7 +1363,10 @@ impl AIDriver {
             }
         }
         // Night: some drivers forget their lights.
-        if dark && lights.headlight_switch == crate::vehicle::HeadlightSwitch::Off && self.rng.chance(0.002) {
+        if dark
+            && lights.headlight_switch == crate::vehicle::HeadlightSwitch::Off
+            && self.rng.chance(0.002)
+        {
             lights.headlight_switch = crate::vehicle::HeadlightSwitch::Auto;
         }
     }
@@ -1187,9 +1395,16 @@ impl AIDriver {
         if self.horn_cooldown > 0.0 {
             return;
         }
-        self.horn_hold = if long { self.rng.range(1.2, 2.2) } else { self.rng.range(0.25, 0.45) };
+        self.horn_hold = if long {
+            self.rng.range(1.2, 2.2)
+        } else {
+            self.rng.range(0.25, 0.45)
+        };
         self.horn_cooldown = if long { 4.0 } else { 2.2 };
-        sim.emit(Event::Horn { vehicle: self.vid, long });
+        sim.emit(Event::Horn {
+            vehicle: self.vid,
+            long,
+        });
         sim.horn_victims(self.vid, long);
     }
 
@@ -1214,7 +1429,11 @@ impl AIDriver {
             return;
         }
         self.speech_cooldown = self.rng.range(5.0, 9.0);
-        events.emit(Event::Speech { vehicle: self.vid, text: text.to_string(), mood: self.emo.mood });
+        events.emit(Event::Speech {
+            vehicle: self.vid,
+            text: text.to_string(),
+            mood: self.emo.mood,
+        });
     }
 
     /// Say a random line for `mood`/`kind`.
@@ -1224,25 +1443,48 @@ impl AIDriver {
     }
 
     /// React to an offense (called after anger was applied).
-    pub fn on_offended(&mut self, sim: &mut Sim, _vi: usize, _offender: VehicleId, kind: OffenseKind) {
+    pub fn on_offended(
+        &mut self,
+        sim: &mut Sim,
+        _vi: usize,
+        _offender: VehicleId,
+        kind: OffenseKind,
+    ) {
         let mood = self.emo.mood;
         let horn_chance = self.p.horn_happiness * if mood == Mood::Calm { 0.4 } else { 1.0 };
-        if kind != OffenseKind::HonkedAt && kind != OffenseKind::LongHonk && self.rng.chance(horn_chance) {
+        if kind != OffenseKind::HonkedAt
+            && kind != OffenseKind::LongHonk
+            && self.rng.chance(horn_chance)
+        {
             self.honk(sim, mood == Mood::Angry || mood == Mood::Furious);
         }
-        if (mood != Mood::Calm || kind == OffenseKind::Collision || kind == OffenseKind::NearMiss) && self.rng.chance(0.6) {
+        if (mood != Mood::Calm || kind == OffenseKind::Collision || kind == OffenseKind::NearMiss)
+            && self.rng.chance(0.6)
+        {
             self.say_line(&mut sim.events, mood, Some(kind));
         }
     }
 
     /// An offense against this driver while its brain is running.
-    fn offend_self(&mut self, sim: &mut Sim, vi: usize, offender: VehicleId, kind: OffenseKind, scale: f64) {
+    fn offend_self(
+        &mut self,
+        sim: &mut Sim,
+        vi: usize,
+        offender: VehicleId,
+        kind: OffenseKind,
+        scale: f64,
+    ) {
         if offender == self.vid {
             return;
         }
         let gain = self.emo.offend(Some(offender), kind, scale, sim.time);
         if !kind.is_continuous() && gain > 0.5 {
-            sim.emit(Event::Offense { offender, victim: self.vid, kind, anger: self.emo.anger });
+            sim.emit(Event::Offense {
+                offender,
+                victim: self.vid,
+                kind,
+                anger: self.emo.anger,
+            });
             self.on_offended(sim, vi, offender, kind);
         }
     }
@@ -1257,7 +1499,13 @@ impl AIDriver {
             let thw = l.gap / v_speed.max(1.0);
             if thw < 0.75 && l.gap < self.prev_leader_gap - 3.0 {
                 if let Some(off) = l.id.filter(|&id| sim.vehicle(id).is_some()) {
-                    self.offend_self(sim, vi, off, OffenseKind::CutOff, clamp((0.9 - thw) * 2.5, 0.5, 2.0));
+                    self.offend_self(
+                        sim,
+                        vi,
+                        off,
+                        OffenseKind::CutOff,
+                        clamp((0.9 - thw) * 2.5, 0.5, 2.0),
+                    );
                 }
             }
         }
@@ -1273,7 +1521,9 @@ impl AIDriver {
                 if self.blocked_time > limit {
                     let lid = sim.vehicles[li].id;
                     self.offend_self(sim, vi, lid, OffenseKind::Blocked, dt * 2.0);
-                    if self.horn_cooldown <= 0.0 && self.rng.chance(0.4 + self.p.horn_happiness * 0.5) {
+                    if self.horn_cooldown <= 0.0
+                        && self.rng.chance(0.4 + self.p.horn_happiness * 0.5)
+                    {
                         let long = self.blocked_time > limit * 2.0 || self.emo.mood == Mood::Angry;
                         self.honk(sim, long);
                     }
@@ -1288,7 +1538,9 @@ impl AIDriver {
         let v = &sim.vehicles[vi];
         let lim = v.seg.map_or(10.0, |s| sim.net.seg_speed_limit(s));
         let leader_alive = l.id.and_then(|id| sim.vidx(id));
-        if let Some(li) = leader_alive.filter(|_| l.gap < 25.0 && l.speed > 1.0 && l.speed < lim * 0.55 && self.stop_dist == f64::INFINITY) {
+        if let Some(li) = leader_alive.filter(|_| {
+            l.gap < 25.0 && l.speed > 1.0 && l.speed < lim * 0.55 && self.stop_dist == f64::INFINITY
+        }) {
             self.slow_time += dt;
             if self.slow_time > 6.0 + self.p.patience * 10.0 {
                 let lid = sim.vehicles[li].id;
@@ -1303,7 +1555,10 @@ impl AIDriver {
     fn leader_has_reason(&self, sim: &Sim, li: usize) -> bool {
         let lead = &sim.vehicles[li];
         if let Some(d) = lead.driver() {
-            if d.hold_time > 0.0 || d.stop_dist < 8.0 || (d.leader.gap < 8.0 && d.leader.speed < 0.5) {
+            if d.hold_time > 0.0
+                || d.stop_dist < 8.0
+                || (d.leader.gap < 8.0 && d.leader.speed < 0.5)
+            {
                 return true;
             }
             if d.state != DriverState::Drive {
@@ -1318,11 +1573,16 @@ impl AIDriver {
             if to_line < 10.0 {
                 if let Some(ap) = lane.approach.map(|a| sim.net.approach(a)) {
                     match ap.sign {
-                        crate::road::ApproachSign::Stop | crate::road::ApproachSign::Yield => return true,
+                        crate::road::ApproachSign::Stop | crate::road::ApproachSign::Yield => {
+                            return true
+                        }
                         crate::road::ApproachSign::Signal => {
                             if let Some(sid) = sim.net.node(ap.node).signal {
                                 let sig = &sim.signals[sid.idx()];
-                                if lane.outgoing.iter().any(|&c| sig.indication(sim.net.connector(c)) == crate::signals::Indication::Green) {
+                                if lane.outgoing.iter().any(|&c| {
+                                    sig.indication(sim.net.connector(c))
+                                        == crate::signals::Indication::Green
+                                }) {
                                     return self.blocked_time < 4.0;
                                 }
                             }
@@ -1334,7 +1594,11 @@ impl AIDriver {
             }
             // Queued behind someone?
             for e in sim.occ.lane(lid) {
-                if e.vehicle != lead.id && e.s > self.leader.s && e.s - self.leader.s < 10.0 && e.v < 0.5 {
+                if e.vehicle != lead.id
+                    && e.s > self.leader.s
+                    && e.s - self.leader.s < 10.0
+                    && e.v < 0.5
+                {
                     return true;
                 }
             }
@@ -1374,14 +1638,18 @@ impl AIDriver {
         if sim.vehicles[vi].speed < 0.2 {
             self.stuck_time += dt;
             if self.stuck_time > 30.0 {
-                self.emo.offend(None, OffenseKind::LongWait, dt * 2.0, sim.time);
+                self.emo
+                    .offend(None, OffenseKind::LongWait, dt * 2.0, sim.time);
             }
         } else {
             self.stuck_time = 0.0;
         }
         // Angry drivers lean on the horn at their target.
         if let Some(t) = self.emo.target {
-            if (self.emo.mood == Mood::Angry || self.emo.mood == Mood::Furious) && self.leader.id == Some(t) && self.leader.gap < 25.0 {
+            if (self.emo.mood == Mood::Angry || self.emo.mood == Mood::Furious)
+                && self.leader.id == Some(t)
+                && self.leader.gap < 25.0
+            {
                 if self.rng.chance(dt * 0.4 * (0.4 + self.p.horn_happiness)) {
                     self.honk(sim, true);
                 }
@@ -1400,8 +1668,12 @@ impl AIDriver {
             if !self.emo.can_rage() || self.emergency {
                 return;
             }
-            let Some(target) = self.emo.target else { return };
-            let Some(tgt) = sim.vehicle(target).filter(|t| t.alive) else { return };
+            let Some(target) = self.emo.target else {
+                return;
+            };
+            let Some(tgt) = sim.vehicle(target).filter(|t| t.alive) else {
+                return;
+            };
             let dist = ((tgt.x - vx) * (tgt.x - vx) + (tgt.y - vy) * (tgt.y - vy)).sqrt();
             if dist > 70.0 {
                 return;
@@ -1420,8 +1692,20 @@ impl AIDriver {
             } else {
                 RageBehavior::Tailgate
             };
-            self.rage = Some(RageState { target, behavior, time: 0.0, lost_time: 0.0, brake_check: 0.0, cooldown: 0.0, rams: 0 });
-            sim.emit(Event::RageStart { vehicle: self.vid, target, behavior });
+            self.rage = Some(RageState {
+                target,
+                behavior,
+                time: 0.0,
+                lost_time: 0.0,
+                brake_check: 0.0,
+                cooldown: 0.0,
+                rams: 0,
+            });
+            sim.emit(Event::RageStart {
+                vehicle: self.vid,
+                target,
+                behavior,
+            });
             self.say_line(&mut sim.events, Mood::Furious, None);
             if behavior == RageBehavior::Chase {
                 self.start_chase(sim, vi);
@@ -1472,10 +1756,18 @@ impl AIDriver {
                     self.honk(sim, true);
                 }
                 // Escalate: tailgating for a while makes the worst drivers go for contact.
-                if rage.time > 8.0 && self.p.aggression > 0.82 && self.emo.anger > 88.0 && dist < 25.0 {
+                if rage.time > 8.0
+                    && self.p.aggression > 0.82
+                    && self.emo.anger > 88.0
+                    && dist < 25.0
+                {
                     rage.behavior = RageBehavior::Ram;
                     self.rage = Some(rage);
-                    sim.emit(Event::RageStart { vehicle: self.vid, target: rage.target, behavior: RageBehavior::Ram });
+                    sim.emit(Event::RageStart {
+                        vehicle: self.vid,
+                        target: rage.target,
+                        behavior: RageBehavior::Ram,
+                    });
                     self.start_chase(sim, vi);
                 } else if target_behind_me {
                     rage.behavior = RageBehavior::BrakeCheck;
@@ -1488,7 +1780,11 @@ impl AIDriver {
                     rage.cooldown = self.rng.range(6.0, 10.0);
                     self.rage = Some(rage);
                     sim.offend(self.vid, rage.target, OffenseKind::BrakeCheck, 1.0);
-                    sim.emit(Event::RageStart { vehicle: self.vid, target: rage.target, behavior: RageBehavior::BrakeCheck });
+                    sim.emit(Event::RageStart {
+                        vehicle: self.vid,
+                        target: rage.target,
+                        behavior: RageBehavior::BrakeCheck,
+                    });
                 }
                 if !target_behind_me && rage.cooldown <= 0.0 {
                     if let Some(r) = self.rage.as_mut() {
@@ -1503,7 +1799,10 @@ impl AIDriver {
     fn end_rage(&mut self, sim: &mut Sim, reason: &'static str) {
         self.rage = None;
         self.raging = false;
-        sim.emit(Event::RageEnd { vehicle: self.vid, reason });
+        sim.emit(Event::RageEnd {
+            vehicle: self.vid,
+            reason,
+        });
         if self.state == DriverState::Chasing {
             self.state = DriverState::Recovering;
         }
@@ -1511,10 +1810,13 @@ impl AIDriver {
 
     fn is_behind(&self, sim: &Sim, vi: usize, other: VehicleId) -> bool {
         let v = &sim.vehicles[vi];
-        let Some(o) = sim.vehicle(other) else { return false };
+        let Some(o) = sim.vehicle(other) else {
+            return false;
+        };
         let dx = o.x - v.x;
         let dy = o.y - v.y;
-        dx * v.heading.cos() + dy * v.heading.sin() < -3.0 && angle_diff(v.heading, o.heading).abs() < 0.8
+        dx * v.heading.cos() + dy * v.heading.sin() < -3.0
+            && angle_diff(v.heading, o.heading).abs() < 0.8
     }
 
     fn start_chase(&mut self, sim: &mut Sim, vi: usize) {
@@ -1582,14 +1884,20 @@ impl AIDriver {
                     return;
                 };
                 self.update_rage(dt, sim, vi);
-                let tgt = sim.vehicle(rage.target).map(|t| (t.x, t.y, t.vx(), t.vy(), t.abs_speed()));
+                let tgt = sim
+                    .vehicle(rage.target)
+                    .map(|t| (t.x, t.y, t.vx(), t.vy(), t.abs_speed()));
                 // The episode may have changed behaviour (or ended) during the update.
                 let (Some((tx0, ty0, tvx, tvy, t_speed)), Some(rage)) = (tgt, self.rage) else {
                     self.state = DriverState::Recovering;
                     return;
                 };
                 // Aim slightly ahead of the target; ramming means aiming at its flank.
-                let lead = if rage.behavior == RageBehavior::Ram { 0.35 } else { 0.8 };
+                let lead = if rage.behavior == RageBehavior::Ram {
+                    0.35
+                } else {
+                    0.8
+                };
                 let tx = tx0 + tvx * lead;
                 let ty = ty0 + tvy * lead;
                 let v = &mut sim.vehicles[vi];
@@ -1677,7 +1985,14 @@ impl AIDriver {
             self.state = DriverState::Recovering;
             return;
         };
-        let (tx, ty, th, tvx, tvy, t_speed) = (tgt.x, tgt.y, tgt.heading, tgt.vx(), tgt.vy(), tgt.abs_speed());
+        let (tx, ty, th, tvx, tvy, t_speed) = (
+            tgt.x,
+            tgt.y,
+            tgt.heading,
+            tgt.vx(),
+            tgt.vy(),
+            tgt.abs_speed(),
+        );
         let v = &mut sim.vehicles[vi];
         let dx = tx - v.x;
         let dy = ty - v.y;

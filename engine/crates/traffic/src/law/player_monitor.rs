@@ -56,7 +56,11 @@ pub struct Observation {
 
 impl Observation {
     pub fn new(kind: ViolationKind) -> Self {
-        Observation { kind, camera_node: None, speed_camera: false }
+        Observation {
+            kind,
+            camera_node: None,
+            speed_camera: false,
+        }
     }
 }
 
@@ -183,7 +187,9 @@ impl PlayerMonitor {
         self.info.in_junction = node.is_some();
         let lane = aligned.or(opposite).map(|h| h.lane);
         self.info.lane = aligned.map(|h| h.lane);
-        let near_road = hits.first().is_some_and(|h| h.dist < net.lane(h.lane).width / 2.0 + 1.3);
+        let near_road = hits
+            .first()
+            .is_some_and(|h| h.dist < net.lane(h.lane).width / 2.0 + 1.3);
         self.info.on_road = lane.is_some() || node.is_some() || near_road;
         if let Some(l) = lane {
             let ln = net.lane(l);
@@ -218,7 +224,11 @@ impl PlayerMonitor {
             let ll = net.lane(last);
             if c != last && cl.road == ll.road && cl.forward == ll.forward && speed > 3.0 {
                 let to_left = cl.index < ll.index;
-                let t = if to_left { self.signal_left_at } else { self.signal_right_at };
+                let t = if to_left {
+                    self.signal_left_at
+                } else {
+                    self.signal_right_at
+                };
                 if now - t > 3.0 {
                     out.push(Observation::new(ViolationKind::NoSignalLane));
                 }
@@ -260,7 +270,8 @@ impl PlayerMonitor {
                         for &ap in &nn.approaches {
                             for &l in &net.approach(ap).lanes {
                                 for &c in &net.lane(l).outgoing {
-                                    self.entry_snapshot.insert(c, sig.indication(net.connector(c)));
+                                    self.entry_snapshot
+                                        .insert(c, sig.indication(net.connector(c)));
                                 }
                             }
                         }
@@ -305,8 +316,13 @@ impl PlayerMonitor {
                     } else {
                         ViolationKind::SpeedingMinor
                     };
-                    let cam = net.road(ln.road).speed_camera && Self::near_speed_camera(ln.length, aligned.map_or(0.0, |h| h.s));
-                    out.push(Observation { kind, camera_node: None, speed_camera: cam });
+                    let cam = net.road(ln.road).speed_camera
+                        && Self::near_speed_camera(ln.length, aligned.map_or(0.0, |h| h.s));
+                    out.push(Observation {
+                        kind,
+                        camera_node: None,
+                        speed_camera: cam,
+                    });
                 }
             } else {
                 self.speeding_time = 0.0;
@@ -354,7 +370,11 @@ impl PlayerMonitor {
                 }
             }
             self.info.leader_gap = gap;
-            self.info.headway = if speed > 1.0 { gap / speed } else { f64::INFINITY };
+            self.info.headway = if speed > 1.0 {
+                gap / speed
+            } else {
+                f64::INFINITY
+            };
             if speed > 12.0 && self.info.headway < 0.6 {
                 self.tailgate_time += dt;
                 if self.tailgate_time > 4.0 {
@@ -387,7 +407,8 @@ impl PlayerMonitor {
                 continue;
             }
             let behind = dx * p.heading.cos() + dy * p.heading.sin() < -3.0;
-            if behind && angle_diff(p.heading, e.heading).abs() < 45.0 * DEG && e.abs_speed() > 4.0 {
+            if behind && angle_diff(p.heading, e.heading).abs() < 45.0 * DEG && e.abs_speed() > 4.0
+            {
                 emergency_behind = true;
             }
         }
@@ -430,7 +451,9 @@ impl PlayerMonitor {
 
     fn evaluate_movement(&mut self, sim: &Sim, exit_lane: LaneId, out: &mut Vec<Observation>) {
         let net = &sim.net;
-        let (Some(entry), Some(node)) = (self.entry_lane, self.entry_node) else { return };
+        let (Some(entry), Some(node)) = (self.entry_lane, self.entry_node) else {
+            return;
+        };
         let exit_road = net.lane(exit_lane).road;
         let el = net.lane(entry);
         let c = match net.connector_to(entry, exit_road) {
@@ -467,19 +490,37 @@ impl PlayerMonitor {
             let ind = self.entry_snapshot.get(&c).copied();
             match ind {
                 Some(Indication::Red) => {
-                    let allow_ror = nn.signal.is_some_and(|s| sim.signals[s.idx()].allow_right_on_red);
+                    let allow_ror = nn
+                        .signal
+                        .is_some_and(|s| sim.signals[s.idx()].allow_right_on_red);
                     if turn == TurnType::Right && allow_ror {
                         if !self.stopped_near_line {
                             out.push(Observation::new(ViolationKind::RightOnRedNoStop));
                         }
                     } else {
-                        out.push(Observation { kind: ViolationKind::RedLight, camera_node: if nn.red_light_camera { Some(node) } else { None }, speed_camera: false });
+                        out.push(Observation {
+                            kind: ViolationKind::RedLight,
+                            camera_node: if nn.red_light_camera {
+                                Some(node)
+                            } else {
+                                None
+                            },
+                            speed_camera: false,
+                        });
                     }
                 }
-                Some(Indication::FlashRed) | Some(Indication::Dark) if self.min_speed_near_line > 1.5 => out.push(Observation::new(ViolationKind::StopSign)),
+                Some(Indication::FlashRed) | Some(Indication::Dark)
+                    if self.min_speed_near_line > 1.5 =>
+                {
+                    out.push(Observation::new(ViolationKind::StopSign))
+                }
                 _ => {}
             }
-        } else if el.approach.is_some_and(|a| net.approach(a).sign == ApproachSign::Stop) && self.min_speed_near_line > 1.4 {
+        } else if el
+            .approach
+            .is_some_and(|a| net.approach(a).sign == ApproachSign::Stop)
+            && self.min_speed_near_line > 1.4
+        {
             out.push(Observation::new(ViolationKind::StopSign));
         }
     }
@@ -531,6 +572,13 @@ impl PlayerMonitor {
         } else if ap.sign == ApproachSign::Yield {
             control = AheadControl::Yield;
         }
-        self.info.ahead = Some(AheadInfo { distance: dist, control, head, indication, node_name: node.name.clone(), camera: node.red_light_camera });
+        self.info.ahead = Some(AheadInfo {
+            distance: dist,
+            control,
+            head,
+            indication,
+            node_name: node.name.clone(),
+            camera: node.red_light_camera,
+        });
     }
 }

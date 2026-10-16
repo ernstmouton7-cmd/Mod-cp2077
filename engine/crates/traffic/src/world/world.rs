@@ -18,7 +18,10 @@ use crate::math::Rng;
 use crate::physics::{box_contact, resolve_bodies, resolve_static, BoxShape, Contact};
 use crate::player::actions::{ActionId, InputMapper};
 use crate::player::player_driver::PlayerDriver;
-use crate::road::{build_city, build_crosswalks, Building, BuildingKind, CityOptions, Network, RoadKind, Router, SpeedCamera, TurnType};
+use crate::road::{
+    build_city, build_crosswalks, Building, BuildingKind, CityOptions, Network, RoadKind, Router,
+    SpeedCamera, TurnType,
+};
 use crate::signals::{SignalController, SignalMode, SignalOptions};
 use crate::util::SpatialHash;
 use crate::vehicle::{spec, Indicator, MotionMode, SirenMode, Vehicle, VehicleClass, VehicleRole};
@@ -97,7 +100,14 @@ struct WorldPedHost<'a> {
     rng: &'a mut Rng,
 }
 
-const PED_SHOUTS: [&str; 6] = ["Hey! I'm walking here!", "Watch it!", "It's a crosswalk!", "Slow down!", "Are you blind?!", "Jeez!"];
+const PED_SHOUTS: [&str; 6] = [
+    "Hey! I'm walking here!",
+    "Watch it!",
+    "It's a crosswalk!",
+    "Slow down!",
+    "Are you blind?!",
+    "Jeez!",
+];
 
 impl PedHost for WorldPedHost<'_> {
     fn net(&self) -> &Network {
@@ -125,7 +135,12 @@ impl PedHost for WorldPedHost<'_> {
     }
     fn on_shout(&mut self, p: &Pedestrian) {
         let text = self.rng.pick(&PED_SHOUTS);
-        self.events.emit(Event::PedSpeech { ped: p.id, text, x: p.x, y: p.y });
+        self.events.emit(Event::PedSpeech {
+            ped: p.id,
+            text,
+            x: p.x,
+            y: p.y,
+        });
     }
 }
 
@@ -149,11 +164,19 @@ fn traffic_approaching(vehicles: &[Vehicle], x: f64, y: f64, radius: f64, second
 }
 
 fn set_box(v: &Vehicle, shrink: f64) -> BoxShape {
-    BoxShape { x: v.x, y: v.y, heading: v.heading, hl: v.half_len * shrink, hw: v.half_wid * shrink }
+    BoxShape {
+        x: v.x,
+        y: v.y,
+        heading: v.heading,
+        hl: v.half_len * shrink,
+        hw: v.half_wid * shrink,
+    }
 }
 
 fn lane_pair_can_collide(net: &Network, a: &Vehicle, b: &Vehicle) -> bool {
-    let (Some(sa), Some(sb)) = (a.seg, b.seg) else { return false };
+    let (Some(sa), Some(sb)) = (a.seg, b.seg) else {
+        return false;
+    };
     if sa == sb || a.prev_seg == Some(sb) || b.prev_seg == Some(sa) {
         return angle_diff(a.heading, b.heading).abs() < 35.0 * DEG;
     }
@@ -227,11 +250,29 @@ impl World {
             }
             // Coordinate along the x axis for a green wave.
             let offset = ((node.x - net.min_x) / 13.9).max(0.0);
-            let mode = if rng.chance(0.75) { SignalMode::Actuated } else { SignalMode::Fixed };
-            let offset = if mode == SignalMode::Fixed { offset } else { rng.range(0.0, 30.0) };
+            let mode = if rng.chance(0.75) {
+                SignalMode::Actuated
+            } else {
+                SignalMode::Fixed
+            };
+            let offset = if mode == SignalMode::Fixed {
+                offset
+            } else {
+                rng.range(0.0, 30.0)
+            };
             let allow_right_on_red = rng.chance(0.85);
             let sid = SignalId::from(signals.len());
-            let sig = SignalController::new(sid, &mut net, NodeId::from(n), SignalOptions { mode, offset, allow_right_on_red, cycle_scale: 1.0 });
+            let sig = SignalController::new(
+                sid,
+                &mut net,
+                NodeId::from(n),
+                SignalOptions {
+                    mode,
+                    offset,
+                    allow_right_on_red,
+                    cycle_scale: 1.0,
+                },
+            );
             net.nodes[n].signal = Some(sid);
             signals.push(sig);
         }
@@ -241,25 +282,73 @@ impl World {
             if b.kind == BuildingKind::Park || b.kind == BuildingKind::Plaza {
                 continue;
             }
-            obstacles.push(BoxShape { x: b.x, y: b.y, heading: 0.0, hl: b.w / 2.0, hw: b.h / 2.0 });
+            obstacles.push(BoxShape {
+                x: b.x,
+                y: b.y,
+                heading: 0.0,
+                hl: b.w / 2.0,
+                hw: b.h / 2.0,
+            });
         }
         let pad = 16.0;
-        let (x0, x1, y0, y1) = (net.min_x - pad, net.max_x + pad, net.min_y - pad, net.max_y + pad);
+        let (x0, x1, y0, y1) = (
+            net.min_x - pad,
+            net.max_x + pad,
+            net.min_y - pad,
+            net.max_y + pad,
+        );
         let (cx, cy) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
         let t = 3.0;
-        obstacles.push(BoxShape { x: cx, y: y0 - t, heading: 0.0, hl: (x1 - x0) / 2.0 + t * 2.0, hw: t });
-        obstacles.push(BoxShape { x: cx, y: y1 + t, heading: 0.0, hl: (x1 - x0) / 2.0 + t * 2.0, hw: t });
-        obstacles.push(BoxShape { x: x0 - t, y: cy, heading: 0.0, hl: t, hw: (y1 - y0) / 2.0 + t * 2.0 });
-        obstacles.push(BoxShape { x: x1 + t, y: cy, heading: 0.0, hl: t, hw: (y1 - y0) / 2.0 + t * 2.0 });
+        obstacles.push(BoxShape {
+            x: cx,
+            y: y0 - t,
+            heading: 0.0,
+            hl: (x1 - x0) / 2.0 + t * 2.0,
+            hw: t,
+        });
+        obstacles.push(BoxShape {
+            x: cx,
+            y: y1 + t,
+            heading: 0.0,
+            hl: (x1 - x0) / 2.0 + t * 2.0,
+            hw: t,
+        });
+        obstacles.push(BoxShape {
+            x: x0 - t,
+            y: cy,
+            heading: 0.0,
+            hl: t,
+            hw: (y1 - y0) / 2.0 + t * 2.0,
+        });
+        obstacles.push(BoxShape {
+            x: x1 + t,
+            y: cy,
+            heading: 0.0,
+            hl: t,
+            hw: (y1 - y0) / 2.0 + t * 2.0,
+        });
         let mut obstacle_hash = SpatialHash::new(30.0);
         for (i, o) in obstacles.iter().enumerate() {
             obstacle_hash.insert(i as u32, o.x, o.y, o.hl.max(o.hw));
         }
         let (crosswalks, crossings) = build_crosswalks(&net);
         let peds = PedestrianSystem::new(crosswalks, rng.fork());
-        let mut sim = Sim::new(net, router, rng, env, peds, crossings, obstacles, obstacle_hash);
+        let mut sim = Sim::new(
+            net,
+            router,
+            rng,
+            env,
+            peds,
+            crossings,
+            obstacles,
+            obstacle_hash,
+        );
         sim.signals = signals;
-        let mut spawner = Spawner::new(PopulationOptions { civilians: opts.traffic, police: opts.police, min_distance: 90.0 });
+        let mut spawner = Spawner::new(PopulationOptions {
+            civilians: opts.traffic,
+            police: opts.police,
+            min_distance: 90.0,
+        });
         spawner.external = opts.external_physics;
         let mut w = World {
             sim,
@@ -340,8 +429,17 @@ impl World {
 
     /// Swap the player's car for another class (keeps position).
     pub fn set_player_vehicle(&mut self, cls: VehicleClass) {
-        let Some(old) = self.sim.player.and_then(|p| self.sim.vehicle(p)) else { return };
-        let (ox, oy, oh, color, hl, ext) = (old.x, old.y, old.heading, old.color, old.lights.headlight_switch, old.external);
+        let Some(old) = self.sim.player.and_then(|p| self.sim.vehicle(p)) else {
+            return;
+        };
+        let (ox, oy, oh, color, hl, ext) = (
+            old.x,
+            old.y,
+            old.heading,
+            old.color,
+            old.lights.headlight_switch,
+            old.external,
+        );
         let old_id = old.id;
         let id = self.sim.next_vehicle_id();
         let mut v = Vehicle::new(id, spec(cls), color, VehicleRole::Player);
@@ -366,8 +464,17 @@ impl World {
 
     /// Spawn an AI vehicle on a lane (scripted scenarios, tests).
     #[allow(clippy::too_many_arguments)]
-    pub fn spawn_vehicle(&mut self, cls: VehicleClass, role: VehicleRole, lane: LaneId, s: f64, speed: f64, archetype: Option<Archetype>) -> VehicleId {
-        self.spawner.create(&mut self.sim, cls, role, lane, s, speed, archetype)
+    pub fn spawn_vehicle(
+        &mut self,
+        cls: VehicleClass,
+        role: VehicleRole,
+        lane: LaneId,
+        s: f64,
+        speed: f64,
+        archetype: Option<Archetype>,
+    ) -> VehicleId {
+        self.spawner
+            .create(&mut self.sim, cls, role, lane, s, speed, archetype)
     }
 
     /// Remove a vehicle.
@@ -440,17 +547,28 @@ impl World {
 
     /// Signal controller at a node.
     pub fn signal_at(&self, node: NodeId) -> Option<&SignalController> {
-        self.sim.net.node(node).signal.map(|s| &self.sim.signals[s.idx()])
+        self.sim
+            .net
+            .node(node)
+            .signal
+            .map(|s| &self.sim.signals[s.idx()])
     }
 
     /// Is walking allowed across a crosswalk right now?
     pub fn walk_allowed(&self, cw: crate::ids::CrosswalkId, reckless: bool) -> bool {
-        self.sim.peds.walk_allowed(&self.sim.net, &self.sim.signals, cw, reckless)
+        self.sim
+            .peds
+            .walk_allowed(&self.sim.net, &self.sim.signals, cw, reckless)
     }
 
     /// Vehicles within `r` of a point (renderer LOD).
     pub fn vehicles_near(&self, x: f64, y: f64, r: f64) -> Vec<VehicleId> {
-        self.sim.vehicles.iter().filter(|v| (v.x - x) * (v.x - x) + (v.y - y) * (v.y - y) <= r * r).map(|v| v.id).collect()
+        self.sim
+            .vehicles
+            .iter()
+            .filter(|v| (v.x - x) * (v.x - x) + (v.y - y) * (v.y - y) <= r * r)
+            .map(|v| v.id)
+            .collect()
     }
 
     /// Drain host actions (camera, pause...).
@@ -460,7 +578,9 @@ impl World {
 
     /// Drivers angry at the player within 120 m: (vehicle, anger, raging at player), angriest first.
     pub fn angry_at_player(&self) -> Vec<(VehicleId, f64, bool)> {
-        let Some(p) = self.player() else { return Vec::new() };
+        let Some(p) = self.player() else {
+            return Vec::new();
+        };
         let mut out: Vec<(VehicleId, f64, bool)> = self
             .sim
             .vehicles
@@ -468,10 +588,15 @@ impl World {
             .filter_map(|v| {
                 let d = v.driver()?;
                 let g = d.emo.grudge_against(p.id);
-                (g > 10.0 && hypot(v.x - p.x, v.y - p.y) < 120.0).then(|| (v.id, d.emo.anger, d.rage.is_some_and(|r| r.target == p.id)))
+                (g > 10.0 && hypot(v.x - p.x, v.y - p.y) < 120.0)
+                    .then(|| (v.id, d.emo.anger, d.rage.is_some_and(|r| r.target == p.id)))
             })
             .collect();
-        out.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal).then(a.0.cmp(&b.0)));
+        out.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.0.cmp(&b.0))
+        });
         out
     }
 
@@ -554,7 +679,11 @@ impl World {
                 self.sim.vehicles[i].driver = Some(d);
                 self.sim.flush_deferred();
                 if changed {
-                    self.sim.emit(Event::Mood { vehicle: vid, mood, target });
+                    self.sim.emit(Event::Mood {
+                        vehicle: vid,
+                        mood,
+                        target,
+                    });
                 }
             }
             i += 1;
@@ -565,7 +694,13 @@ impl World {
         self.collisions();
         self.law_and_order(dt);
         self.ambulances(dt);
-        let busy: Vec<VehicleId> = self.police.units.iter().copied().chain(self.ambulance).collect();
+        let busy: Vec<VehicleId> = self
+            .police
+            .units
+            .iter()
+            .copied()
+            .chain(self.ambulance)
+            .collect();
         let density = self.sim.env.traffic_density;
         self.spawner.update(dt, density, &mut self.sim, &busy);
         // Stale all-way stop arrivals (every 2 s).
@@ -575,9 +710,13 @@ impl World {
         }
         self.cleanup_timer = 2.0;
         let now = self.sim.time;
-        let Sim { all_way, vehicles, .. } = &mut self.sim;
+        let Sim {
+            all_way, vehicles, ..
+        } = &mut self.sim;
         for q in all_way.values_mut() {
-            q.retain(|id, t| now - *t <= 60.0 && vehicles.binary_search_by_key(id, |v| v.id).is_ok());
+            q.retain(|id, t| {
+                now - *t <= 60.0 && vehicles.binary_search_by_key(id, |v| v.id).is_ok()
+            });
         }
     }
 
@@ -592,7 +731,11 @@ impl World {
                     k != RoadKind::Avenue && k != RoadKind::Ring
                 });
                 if minor {
-                    self.sim.signals[i].set_mode(if flash { SignalMode::Flashing } else { SignalMode::Actuated });
+                    self.sim.signals[i].set_mode(if flash {
+                        SignalMode::Flashing
+                    } else {
+                        SignalMode::Actuated
+                    });
                 }
             }
         }
@@ -623,17 +766,32 @@ impl World {
         }
         self.sim.signals = signals;
         for ch in changes {
-            self.sim.emit(Event::Signal { node: ch.node, phase: ch.phase, state: ch.state });
+            self.sim.emit(Event::Signal {
+                node: ch.node,
+                phase: ch.phase,
+                state: ch.state,
+            });
         }
     }
 
     fn update_player(&mut self, dt: f64) {
-        let (Some(pi), Some(pd)) = (self.sim.player_idx(), self.player_driver.as_mut()) else { return };
+        let (Some(pi), Some(pd)) = (self.sim.player_idx(), self.player_driver.as_mut()) else {
+            return;
+        };
         let u = self.sim.vehicles[pi].dynamics.u;
         let frame = self.input.frame(dt, u);
         let dark = self.sim.env.dark;
-        let Sim { vehicles, events, .. } = &mut self.sim;
-        pd.update(dt, &frame, &mut vehicles[pi], events, dark, self.monitor.info.speed_limit);
+        let Sim {
+            vehicles, events, ..
+        } = &mut self.sim;
+        pd.update(
+            dt,
+            &frame,
+            &mut vehicles[pi],
+            events,
+            dark,
+            self.monitor.info.speed_limit,
+        );
         self.host_actions.append(&mut pd.host_actions);
         let seatbelt = pd.seatbelt;
         let gesture = pd.gesture;
@@ -644,12 +802,23 @@ impl World {
             self.sim.env.hour = fmod(self.sim.env.hour + 1.0, 24.0);
         }
         if frame.pressed.contains(&ActionId::WeatherCycle) {
-            let order = [Weather::Clear, Weather::Rain, Weather::Storm, Weather::Fog, Weather::Cloudy];
-            let i = order.iter().position(|&w| w == self.sim.env.weather).unwrap_or(0);
+            let order = [
+                Weather::Clear,
+                Weather::Rain,
+                Weather::Storm,
+                Weather::Fog,
+                Weather::Cloudy,
+            ];
+            let i = order
+                .iter()
+                .position(|&w| w == self.sim.env.weather)
+                .unwrap_or(0);
             self.sim.env.set_weather(order[(i + 1) % order.len()]);
         }
         self.monitor.seatbelt = seatbelt;
-        let Some(pi) = self.sim.player_idx() else { return };
+        let Some(pi) = self.sim.player_idx() else {
+            return;
+        };
         // Intent for AI yielding: from the indicator and current lane.
         let mut intent = None;
         if let Some(lane) = self.monitor.info.lane {
@@ -669,7 +838,9 @@ impl World {
         if let Some(g) = gesture {
             self.gesture(pid, g);
         }
-        if frame.pressed.contains(&ActionId::Hazards) && self.sim.vehicle(pid).is_some_and(|p| p.lights.hazard) {
+        if frame.pressed.contains(&ActionId::Hazards)
+            && self.sim.vehicle(pid).is_some_and(|p| p.lights.hazard)
+        {
             self.thank_you_blink(pid);
         }
         if frame.pressed.contains(&ActionId::Horn) {
@@ -688,7 +859,9 @@ impl World {
 
     fn gesture(&mut self, pid: VehicleId, kind: GestureKind) {
         self.sim.emit(Event::Gesture { from: pid, kind });
-        let Some(p) = self.sim.vehicle(pid) else { return };
+        let Some(p) = self.sim.vehicle(pid) else {
+            return;
+        };
         let (px, py) = (p.x, p.y);
         let mut i = 0;
         while i < self.sim.vehicles.len() {
@@ -704,17 +877,32 @@ impl World {
             if kind == GestureKind::Wave && dist < 45.0 {
                 if grudge > 0.0 {
                     let now = self.sim.time;
-                    let Sim { vehicles, events, rng, .. } = &mut self.sim;
+                    let Sim {
+                        vehicles,
+                        events,
+                        rng,
+                        ..
+                    } = &mut self.sim;
                     let d = vehicles[i].driver_mut().expect("driver");
                     let calmed = d.emo.apologize(pid, now);
-                    events.emit(Event::Apology { from: pid, to: vid, calmed });
+                    events.emit(Event::Apology {
+                        from: pid,
+                        to: vid,
+                        calmed,
+                    });
                     d.speech_cooldown = 0.0;
-                    let line = if d.emo.anger < 35.0 { rng.pick(&APOLOGY_ACCEPTED) } else { rng.pick(&APOLOGY_REJECTED) };
+                    let line = if d.emo.anger < 35.0 {
+                        rng.pick(&APOLOGY_ACCEPTED)
+                    } else {
+                        rng.pick(&APOLOGY_REJECTED)
+                    };
                     d.say(events, line);
                 }
             } else if kind == GestureKind::Rude && dist < 30.0 {
                 if zen {
-                    let Sim { vehicles, events, .. } = &mut self.sim;
+                    let Sim {
+                        vehicles, events, ..
+                    } = &mut self.sim;
                     let d = vehicles[i].driver_mut().expect("driver");
                     d.speech_cooldown = 0.0;
                     d.say(events, "Have a nice day!");
@@ -728,10 +916,14 @@ impl World {
 
     /// Hazards blink after merging: a softer apology to drivers behind.
     fn thank_you_blink(&mut self, pid: VehicleId) {
-        let Some(p) = self.sim.vehicle(pid) else { return };
+        let Some(p) = self.sim.vehicle(pid) else {
+            return;
+        };
         let (px, py, ph) = (p.x, p.y, p.heading);
         let now = self.sim.time;
-        let Sim { vehicles, events, .. } = &mut self.sim;
+        let Sim {
+            vehicles, events, ..
+        } = &mut self.sim;
         for v in vehicles.iter_mut() {
             let (dx, dy, vid) = (v.x - px, v.y - py, v.id);
             let Some(d) = v.driver_mut() else { continue };
@@ -743,12 +935,18 @@ impl World {
                 continue;
             }
             let calmed = d.emo.apologize(pid, now) * 0.6;
-            events.emit(Event::Apology { from: pid, to: vid, calmed });
+            events.emit(Event::Apology {
+                from: pid,
+                to: vid,
+                calmed,
+            });
         }
     }
 
     fn flash_ahead(&mut self, pid: VehicleId) {
-        let Some(p) = self.sim.vehicle(pid) else { return };
+        let Some(p) = self.sim.vehicle(pid) else {
+            return;
+        };
         let (px, py, ph) = (p.x, p.y, p.heading);
         let now = self.sim.time;
         let targets: Vec<VehicleId> = self
@@ -792,8 +990,10 @@ impl World {
                 v.inputs.throttle = 0.0;
             }
             let dynm = &mut v.dynamics;
-            let cut = (if dynm.tcs_active { 0.4 } else { 1.0 }) * (if dynm.esc_active { 0.6 } else { 1.0 });
-            let torque = v.pt.update(dt, dynm.driven_omega(), v.inputs.throttle, dynm.u, cut);
+            let cut = (if dynm.tcs_active { 0.4 } else { 1.0 })
+                * (if dynm.esc_active { 0.6 } else { 1.0 });
+            let torque =
+                v.pt.update(dt, dynm.driven_omega(), v.inputs.throttle, dynm.u, cut);
             if !v.external {
                 let on_road = if v.is_player { on_road_player } else { true };
                 dynm.surface_grip = grip * if on_road { 1.0 } else { 0.82 };
@@ -869,7 +1069,9 @@ impl World {
                 if bid <= aid {
                     continue;
                 }
-                let Some(bi) = self.sim.vidx(bid) else { continue };
+                let Some(bi) = self.sim.vidx(bid) else {
+                    continue;
+                };
                 let a = &self.sim.vehicles[i];
                 let b = &self.sim.vehicles[bi];
                 if !b.alive || a.external || b.external {
@@ -883,7 +1085,9 @@ impl World {
                 } else {
                     (set_box(a, 1.0), set_box(b, 1.0))
                 };
-                let Some(contact) = box_contact(&ba, &bb) else { continue };
+                let Some(contact) = box_contact(&ba, &bb) else {
+                    continue;
+                };
                 self.resolve_vehicles(i, bi, contact);
             }
             let a = &self.sim.vehicles[i];
@@ -912,7 +1116,11 @@ impl World {
             return;
         }
         if !b_lane && a_lane && closing < 1.2 {
-            let c2 = Contact { nx: -contact.nx, ny: -contact.ny, ..contact };
+            let c2 = Contact {
+                nx: -contact.nx,
+                ny: -contact.ny,
+                ..contact
+            };
             let b = &mut self.sim.vehicles[bi];
             resolve_static(&mut b.dynamics, &c2, 0.1, 0.3);
             b.sync_from_dynamics();
@@ -932,7 +1140,11 @@ impl World {
         let at_fault = if a_into >= b_into { aid } else { bid };
         let j = {
             let (lo, hi) = self.sim.vehicles.split_at_mut(bi.max(ai));
-            let (va, vb) = if ai < bi { (&mut lo[ai], &mut hi[0]) } else { (&mut hi[0], &mut lo[bi]) };
+            let (va, vb) = if ai < bi {
+                (&mut lo[ai], &mut hi[0])
+            } else {
+                (&mut hi[0], &mut lo[bi])
+            };
             let j = resolve_bodies(&mut va.dynamics, &mut vb.dynamics, &contact, 0.15, 0.4);
             va.sync_from_dynamics();
             vb.sync_from_dynamics();
@@ -946,17 +1158,29 @@ impl World {
 
     /// Damage, crash reactions, events, anger and law after an impact of `j` N·s.
     #[allow(clippy::too_many_arguments)]
-    fn collision_consequences(&mut self, ai: usize, bi: usize, j: f64, px: f64, py: f64, at_fault: VehicleId, a_was_lane: bool, b_was_lane: bool) {
+    fn collision_consequences(
+        &mut self,
+        ai: usize,
+        bi: usize,
+        j: f64,
+        px: f64,
+        py: f64,
+        at_fault: VehicleId,
+        a_was_lane: bool,
+        b_was_lane: bool,
+    ) {
         let sev_a = j / self.sim.vehicles[ai].dynamics.mass;
         let sev_b = j / self.sim.vehicles[bi].dynamics.mass;
         self.damage(ai, sev_a, px, py);
         self.damage(bi, sev_b, px, py);
         let severity = sev_a.max(sev_b);
         if a_was_lane || severity > 2.0 {
-            self.sim.with_driver(ai, |d, sim| d.on_crash(sim, ai, sev_a));
+            self.sim
+                .with_driver(ai, |d, sim| d.on_crash(sim, ai, sev_a));
         }
         if b_was_lane || severity > 2.0 {
-            self.sim.with_driver(bi, |d, sim| d.on_crash(sim, bi, sev_b));
+            self.sim
+                .with_driver(bi, |d, sim| d.on_crash(sim, bi, sev_b));
         }
         let (aid, bid) = (self.sim.vehicles[ai].id, self.sim.vehicles[bi].id);
         let victim = if at_fault == aid { bid } else { aid };
@@ -973,16 +1197,37 @@ impl World {
         }
         if severity > 0.8 {
             self.sim.stats.collisions += 1;
-            self.sim.emit(Event::Collision { a: aid, b: bid, impulse: j, severity, x: px, y: py, at_fault });
-            self.sim.offend(at_fault, victim, OffenseKind::Collision, clamp(severity / 4.0, 0.5, 2.5));
+            self.sim.emit(Event::Collision {
+                a: aid,
+                b: bid,
+                impulse: j,
+                severity,
+                x: px,
+                y: py,
+                at_fault,
+            });
+            self.sim.offend(
+                at_fault,
+                victim,
+                OffenseKind::Collision,
+                clamp(severity / 4.0, 0.5, 2.5),
+            );
             if victim != at_fault {
-                self.sim.offend(victim, at_fault, OffenseKind::Collision, 0.3);
+                self.sim
+                    .offend(victim, at_fault, OffenseKind::Collision, 0.3);
             }
         }
         if let Some(p) = self.sim.player.and_then(|p| self.sim.vehicle(p)) {
             if p.id == at_fault && severity > 1.5 {
-                self.monitor.hit_run = Some(HitRun { x: p.x, y: p.y, time: now, stopped_for: 0.0, victim: Some(victim) });
-                self.observations.push(Observation::new(ViolationKind::Collision));
+                self.monitor.hit_run = Some(HitRun {
+                    x: p.x,
+                    y: p.y,
+                    time: now,
+                    stopped_for: 0.0,
+                    victim: Some(victim),
+                });
+                self.observations
+                    .push(Observation::new(ViolationKind::Collision));
             }
         }
         if severity > 7.0 {
@@ -1005,12 +1250,16 @@ impl World {
         let mut buf = Vec::new();
         {
             let v = &self.sim.vehicles[vi];
-            self.sim.obstacle_hash.query(v.x, v.y, v.half_len + 1.0, &mut buf);
+            self.sim
+                .obstacle_hash
+                .query(v.x, v.y, v.half_len + 1.0, &mut buf);
         }
         for oi in buf {
             let o = self.sim.obstacles[oi as usize];
             let v = &mut self.sim.vehicles[vi];
-            let Some(contact) = box_contact(&set_box(v, 1.0), &o) else { continue };
+            let Some(contact) = box_contact(&set_box(v, 1.0), &o) else {
+                continue;
+            };
             let j = resolve_static(&mut v.dynamics, &contact, 0.12, 0.5);
             v.sync_from_dynamics();
             if j > 0.0 {
@@ -1018,9 +1267,16 @@ impl World {
                 let vid = v.id;
                 self.damage(vi, sev, contact.px, contact.py);
                 if sev > 1.5 {
-                    self.sim.emit(Event::CrashStatic { vehicle: vid, severity: sev, x: contact.px, y: contact.py });
+                    self.sim.emit(Event::CrashStatic {
+                        vehicle: vid,
+                        severity: sev,
+                        x: contact.px,
+                        y: contact.py,
+                    });
                 }
-                let chasing = self.sim.vehicles[vi].driver().is_some_and(|d| d.state == DriverState::Chasing);
+                let chasing = self.sim.vehicles[vi]
+                    .driver()
+                    .is_some_and(|d| d.state == DriverState::Chasing);
                 if sev > 3.0 && chasing {
                     self.sim.with_driver(vi, |d, sim| d.on_crash(sim, vi, sev));
                 }
@@ -1054,7 +1310,9 @@ impl World {
                 v.wrecked = true;
                 v.lights.hazard = !v.is_player;
                 if v.is_player {
-                    self.sim.emit(Event::Info { text: "Your vehicle is wrecked. Press ` to reset.".into() });
+                    self.sim.emit(Event::Info {
+                        text: "Your vehicle is wrecked. Press ` to reset.".into(),
+                    });
                 }
             }
         }
@@ -1062,7 +1320,9 @@ impl World {
 
     /// Put the player back on the nearest road (repairs cost money).
     pub fn reset_player(&mut self) {
-        let Some(pi) = self.sim.player_idx() else { return };
+        let Some(pi) = self.sim.player_idx() else {
+            return;
+        };
         let (px, py) = (self.sim.vehicles[pi].x, self.sim.vehicles[pi].y);
         let hits = self.sim.net.nearest_lanes(px, py, 200.0);
         let Some(h) = hits.first() else { return };
@@ -1086,7 +1346,9 @@ impl World {
         }
         if cost > 0.0 {
             self.record.money -= cost;
-            self.sim.emit(Event::Info { text: format!("Vehicle repaired: -€${cost}") });
+            self.sim.emit(Event::Info {
+                text: format!("Vehicle repaired: -€${cost}"),
+            });
         }
     }
 
@@ -1103,7 +1365,8 @@ impl World {
             self.observations = obs;
             self.player_social(dt);
         }
-        self.police.update(dt, &mut self.sim, &mut self.record, &self.spawner);
+        self.police
+            .update(dt, &mut self.sim, &mut self.record, &self.spawner);
     }
 
     fn handle_violation(&mut self, kind: ViolationKind, red_camera: bool, speed_camera: bool) {
@@ -1111,7 +1374,9 @@ impl World {
         if !self.record.can_charge(kind, now) {
             return;
         }
-        let Some(p) = self.sim.player.and_then(|p| self.sim.vehicle(p)) else { return };
+        let Some(p) = self.sim.player.and_then(|p| self.sim.vehicle(p)) else {
+            return;
+        };
         let (pid, px, py) = (p.id, p.x, p.y);
         let cops = self.sim.police_near(px, py, 110.0);
         let witness = if !cops.is_empty() {
@@ -1122,14 +1387,42 @@ impl World {
             Witness::None
         };
         let rec = self.record.add(kind, now, witness, px, py);
-        self.sim.emit(Event::Violation { vehicle: pid, kind, label: rec.label, fine: rec.fine, points: rec.points, witnessed: witness, x: px, y: py });
+        self.sim.emit(Event::Violation {
+            vehicle: pid,
+            kind,
+            label: rec.label,
+            fine: rec.fine,
+            points: rec.points,
+            witnessed: witness,
+            x: px,
+            y: py,
+        });
         match witness {
             Witness::Camera => {
-                self.sim.emit(Event::CameraFlash { x: px, y: py, kind: if red_camera { super::events::CameraKind::RedLight } else { super::events::CameraKind::Speed } });
-                self.sim.emit(Event::Ticket { vehicle: pid, total: rec.fine, points: rec.points, reason: format!("{} (camera)", rec.label) });
+                self.sim.emit(Event::CameraFlash {
+                    x: px,
+                    y: py,
+                    kind: if red_camera {
+                        super::events::CameraKind::RedLight
+                    } else {
+                        super::events::CameraKind::Speed
+                    },
+                });
+                self.sim.emit(Event::Ticket {
+                    vehicle: pid,
+                    total: rec.fine,
+                    points: rec.points,
+                    reason: format!("{} (camera)", rec.label),
+                });
             }
             Witness::Police => {
-                self.police.report(&mut self.sim, &self.spawner, cops.first().copied(), &mut self.record, kind.def().heat);
+                self.police.report(
+                    &mut self.sim,
+                    &self.spawner,
+                    cops.first().copied(),
+                    &mut self.record,
+                    kind.def().heat,
+                );
             }
             Witness::None => {}
         }
@@ -1137,9 +1430,20 @@ impl World {
 
     /// Player behaviour that upsets AI drivers: tailgating, near misses.
     fn player_social(&mut self, dt: f64) {
-        let Some(pi) = self.sim.player_idx() else { return };
+        let Some(pi) = self.sim.player_idx() else {
+            return;
+        };
         let p = &self.sim.vehicles[pi];
-        let (pid, px, py, ph, pspeed, pvx, pvy, phw) = (p.id, p.x, p.y, p.heading, p.abs_speed(), p.vx(), p.vy(), p.half_wid);
+        let (pid, px, py, ph, pspeed, pvx, pvy, phw) = (
+            p.id,
+            p.x,
+            p.y,
+            p.heading,
+            p.abs_speed(),
+            p.vx(),
+            p.vy(),
+            p.half_wid,
+        );
         let info = &self.monitor.info;
         match info.lane {
             Some(lane) if info.headway < 0.7 && pspeed > 6.0 && info.leader_gap < 20.0 => {
@@ -1149,7 +1453,9 @@ impl World {
                     if e.vehicle == pid {
                         continue;
                     }
-                    let Some(v) = self.sim.vehicle(e.vehicle) else { continue };
+                    let Some(v) = self.sim.vehicle(e.vehicle) else {
+                        continue;
+                    };
                     let d = (v.x - px) * ph.cos() + (v.y - py) * ph.sin();
                     if d > 0.0 && d < best {
                         best = d;
@@ -1174,7 +1480,9 @@ impl World {
                 if vid == pid {
                     continue;
                 }
-                let Some(v) = self.sim.vehicle(vid) else { continue };
+                let Some(v) = self.sim.vehicle(vid) else {
+                    continue;
+                };
                 let d = hypot(v.x - px, v.y - py) - (v.half_wid + phw);
                 let rel = hypot(v.vx() - pvx, v.vy() - pvy);
                 if d < 1.2 && rel > 7.0 {
@@ -1185,7 +1493,8 @@ impl World {
                     }
                     self.near_miss_memo.insert(vid, now);
                     self.sim.emit(Event::NearMiss { a: pid, b: vid });
-                    self.sim.offend(pid, vid, OffenseKind::NearMiss, clamp(rel / 12.0, 0.5, 2.0));
+                    self.sim
+                        .offend(pid, vid, OffenseKind::NearMiss, clamp(rel / 12.0, 0.5, 2.0));
                 }
             }
         }
@@ -1198,7 +1507,10 @@ impl World {
         if self.breakdown_interval > 0.0 {
             self.breakdown_timer -= dt;
             if self.breakdown_timer <= 0.0 {
-                self.breakdown_timer = self.sim.rng.range(self.breakdown_interval * 0.6, self.breakdown_interval * 1.4);
+                self.breakdown_timer = self
+                    .sim
+                    .rng
+                    .range(self.breakdown_interval * 0.6, self.breakdown_interval * 1.4);
                 // Prefer a car the player will meet: 50-300 m away, mid-block.
                 let net = &self.sim.net;
                 let cands: Vec<usize> = self
@@ -1207,8 +1519,13 @@ impl World {
                     .iter()
                     .enumerate()
                     .filter(|(_, v)| {
-                        let Some(SegRef::Lane(l)) = v.seg else { return false };
-                        if v.role != VehicleRole::Civilian || v.mode != MotionMode::Lane || v.speed < 3.0 {
+                        let Some(SegRef::Lane(l)) = v.seg else {
+                            return false;
+                        };
+                        if v.role != VehicleRole::Civilian
+                            || v.mode != MotionMode::Lane
+                            || v.speed < 3.0
+                        {
                             return false;
                         }
                         if v.s < 15.0 || net.lane(l).length - v.s < 35.0 {
@@ -1233,15 +1550,29 @@ impl World {
                     if let Some(d) = v.driver_mut() {
                         d.hold(HoldKind::Breakdown, secs);
                     }
-                    let place = v.seg.and_then(|s| s.lane()).map(|l| self.sim.net.road(self.sim.net.lane(l).road).name.clone()).unwrap_or_default();
-                    self.sim.emit(Event::Incident { kind: IncidentKind::Breakdown, x, y, vehicle: Some(vid), node: None, place });
+                    let place = v
+                        .seg
+                        .and_then(|s| s.lane())
+                        .map(|l| self.sim.net.road(self.sim.net.lane(l).road).name.clone())
+                        .unwrap_or_default();
+                    self.sim.emit(Event::Incident {
+                        kind: IncidentKind::Breakdown,
+                        x,
+                        y,
+                        vehicle: Some(vid),
+                        node: None,
+                        place,
+                    });
                 }
             }
         }
         if self.outage_interval > 0.0 && !self.sim.signals.is_empty() {
             self.outage_timer -= dt;
             if self.outage_timer <= 0.0 {
-                self.outage_timer = self.sim.rng.range(self.outage_interval * 0.6, self.outage_interval * 1.4);
+                self.outage_timer = self
+                    .sim
+                    .rng
+                    .range(self.outage_interval * 0.6, self.outage_interval * 1.4);
                 let si = self.sim.rng.index(self.sim.signals.len());
                 let mode = self.sim.signals[si].mode;
                 if mode != SignalMode::Off && mode != SignalMode::Flashing {
@@ -1250,7 +1581,14 @@ impl World {
                     self.outages.push((SignalId::from(si), until));
                     let node = self.sim.net.node(self.sim.signals[si].node);
                     let (x, y, nid, place) = (node.x, node.y, node.id, node.name.clone());
-                    self.sim.emit(Event::Incident { kind: IncidentKind::PowerCut, x, y, vehicle: None, node: Some(nid), place });
+                    self.sim.emit(Event::Incident {
+                        kind: IncidentKind::PowerCut,
+                        x,
+                        y,
+                        vehicle: None,
+                        node: Some(nid),
+                        place,
+                    });
                 }
             }
         }
@@ -1266,7 +1604,14 @@ impl World {
             self.outages.remove(i);
             let node = self.sim.net.node(self.sim.signals[sid.idx()].node);
             let (x, y, nid, place) = (node.x, node.y, node.id, node.name.clone());
-            self.sim.emit(Event::Incident { kind: IncidentKind::PowerRestored, x, y, vehicle: None, node: Some(nid), place });
+            self.sim.emit(Event::Incident {
+                kind: IncidentKind::PowerRestored,
+                x,
+                y,
+                vehicle: None,
+                node: Some(nid),
+                place,
+            });
         }
     }
 
@@ -1275,11 +1620,30 @@ impl World {
     fn update_pedestrians(&mut self, dt: f64) {
         let env = &self.sim.env;
         let night = 1.0 - env.daylight;
-        let target = js_round(self.pedestrian_density * (1.0 - night * 0.6) * (0.5 + env.traffic_density * 0.5) * (1.0 - env.rain * 0.5));
+        let target = js_round(
+            self.pedestrian_density
+                * (1.0 - night * 0.6)
+                * (0.5 + env.traffic_density * 0.5)
+                * (1.0 - env.rain * 0.5),
+        );
         self.sim.peds.target = target.max(0.0) as usize;
         {
-            let Sim { peds, net, signals, vehicles, events, rng, .. } = &mut self.sim;
-            let mut host = WorldPedHost { net, signals, vehicles, events, rng };
+            let Sim {
+                peds,
+                net,
+                signals,
+                vehicles,
+                events,
+                rng,
+                ..
+            } = &mut self.sim;
+            let mut host = WorldPedHost {
+                net,
+                signals,
+                vehicles,
+                events,
+                rng,
+            };
             peds.update(dt, &mut host);
         }
         // Vehicles touching pedestrians.
@@ -1294,7 +1658,9 @@ impl World {
             let mut buf = Vec::new();
             self.vehicle_hash.query(pxx, pyy, 4.0, &mut buf);
             for vid in buf {
-                let Some(v) = self.sim.vehicle(vid) else { continue };
+                let Some(v) = self.sim.vehicle(vid) else {
+                    continue;
+                };
                 let ped = &self.sim.peds.peds[k];
                 let c = v.heading.cos();
                 let s = v.heading.sin();
@@ -1302,20 +1668,34 @@ impl World {
                 let ly = -(ped.x - v.x) * s + (ped.y - v.y) * c;
                 let inside = lx.abs() < v.half_len + 0.3 && ly.abs() < v.half_wid + 0.3;
                 let speed = v.abs_speed();
-                let (is_player, vx, vy, physics) = (v.is_player, v.x, v.y, v.mode == MotionMode::Physics);
+                let (is_player, vx, vy, physics) =
+                    (v.is_player, v.x, v.y, v.mode == MotionMode::Physics);
                 let crossing = ped.state == PedState::Crossing;
                 if inside && speed > 1.2 && (physics || crossing) {
                     let ped = &mut self.sim.peds.peds[k];
                     ped.state = PedState::Down;
                     ped.ttl = 40.0;
                     let (pid, x, y) = (ped.id, ped.x, ped.y);
-                    self.sim.emit(Event::PedHit { ped: pid, vehicle: vid, severity: speed, x, y });
+                    self.sim.emit(Event::PedHit {
+                        ped: pid,
+                        vehicle: vid,
+                        severity: speed,
+                        x,
+                        y,
+                    });
                     if speed > 4.0 {
                         self.request_ambulance(x, y);
                     }
                     if is_player {
-                        self.observations.push(Observation::new(ViolationKind::HitPedestrian));
-                        self.monitor.hit_run = Some(HitRun { x: vx, y: vy, time: self.sim.time, stopped_for: 0.0, victim: None });
+                        self.observations
+                            .push(Observation::new(ViolationKind::HitPedestrian));
+                        self.monitor.hit_run = Some(HitRun {
+                            x: vx,
+                            y: vy,
+                            time: self.sim.time,
+                            stopped_for: 0.0,
+                            victim: None,
+                        });
                     }
                     break;
                 }
@@ -1326,9 +1706,15 @@ impl World {
                     ped.shout_cooldown = 5.0;
                     let (pid, x, y) = (ped.id, ped.x, ped.y);
                     let text = self.sim.rng.pick(&PED_SHOUTS);
-                    self.sim.emit(Event::PedSpeech { ped: pid, text, x, y });
+                    self.sim.emit(Event::PedSpeech {
+                        ped: pid,
+                        text,
+                        x,
+                        y,
+                    });
                     if is_player {
-                        self.observations.push(Observation::new(ViolationKind::FailYieldPedestrian));
+                        self.observations
+                            .push(Observation::new(ViolationKind::FailYieldPedestrian));
                     }
                 }
             }
@@ -1339,21 +1725,41 @@ impl World {
     // ----------------------------------------------------------- ambulances
 
     fn request_ambulance(&mut self, x: f64, y: f64) {
-        if self.ambulance.is_some_and(|a| self.sim.vehicle(a).is_some()) {
+        if self
+            .ambulance
+            .is_some_and(|a| self.sim.vehicle(a).is_some())
+        {
             return;
         }
-        let Some((lane, s)) = self.spawner.find_spot(&mut self.sim, 200.0, 700.0) else { return };
-        let id = self.spawner.create(&mut self.sim, VehicleClass::Ambulance, VehicleRole::Ambulance, lane, s, 8.0, None);
+        let Some((lane, s)) = self.spawner.find_spot(&mut self.sim, 200.0, 700.0) else {
+            return;
+        };
+        let id = self.spawner.create(
+            &mut self.sim,
+            VehicleClass::Ambulance,
+            VehicleRole::Ambulance,
+            lane,
+            s,
+            8.0,
+            None,
+        );
         let Some(vi) = self.sim.vidx(id) else { return };
         let hits = self.sim.net.nearest_lanes(x, y, 30.0);
         let target = hits.first().map(|h| {
             let l = self.sim.net.lane(h.lane);
             (l.road, l.forward)
         });
-        let Sim { net, router, vehicles, .. } = &mut self.sim;
+        let Sim {
+            net,
+            router,
+            vehicles,
+            ..
+        } = &mut self.sim;
         let v = &mut vehicles[vi];
         let cur = v.seg;
-        let Some(d) = v.driver.as_deref_mut() else { return };
+        let Some(d) = v.driver.as_deref_mut() else {
+            return;
+        };
         d.emergency = true;
         if let Some((road, fwd)) = target {
             d.route_to(net, router, cur, road, fwd);
@@ -1362,11 +1768,19 @@ impl World {
         v.lights.lightbar = true;
         self.ambulance = Some(id);
         self.ambulance_target = Some((x, y, 0.0));
-        self.sim.emit(Event::Dispatch { unit: id, kind: super::events::DispatchKind::Ambulance, x, y, reason: "collision" });
+        self.sim.emit(Event::Dispatch {
+            unit: id,
+            kind: super::events::DispatchKind::Ambulance,
+            x,
+            y,
+            reason: "collision",
+        });
     }
 
     fn ambulances(&mut self, dt: f64) {
-        let (Some(a), Some((tx, ty, mut tt))) = (self.ambulance, self.ambulance_target) else { return };
+        let (Some(a), Some((tx, ty, mut tt))) = (self.ambulance, self.ambulance_target) else {
+            return;
+        };
         let Some(vi) = self.sim.vidx(a) else {
             self.ambulance = None;
             return;
@@ -1397,7 +1811,9 @@ impl World {
     /// [`World::step`]). Applies to physics-mode vehicles; lane-mode
     /// vehicles keep their kinematic lane pose (returns false).
     pub fn set_external_pose(&mut self, id: VehicleId, pose: ExternalPose) -> bool {
-        let Some(v) = self.sim.vehicle_mut(id) else { return false };
+        let Some(v) = self.sim.vehicle_mut(id) else {
+            return false;
+        };
         if v.mode == MotionMode::Lane {
             return false;
         }
@@ -1446,10 +1862,16 @@ impl World {
     /// static obstacle). The World applies the same consequences as for its
     /// own detected collisions: physics mode, damage, crash reactions,
     /// anger/grudges, collision events, hit-and-run and ambulances.
-    pub fn report_collision(&mut self, a: VehicleId, b: Option<VehicleId>, impulse: f32, point: (f32, f32)) {
+    pub fn report_collision(
+        &mut self,
+        a: VehicleId,
+        b: Option<VehicleId>,
+        impulse: f32,
+        point: (f32, f32),
+    ) {
         let j = impulse as f64;
         let (px, py) = (point.0 as f64, point.1 as f64);
-        if !(j > 0.0) {
+        if j.is_nan() || j <= 0.0 {
             return;
         }
         let Some(ai) = self.sim.vidx(a) else { return };
@@ -1462,9 +1884,16 @@ impl World {
             let sev = j / self.sim.vehicles[ai].dynamics.mass;
             self.damage(ai, sev, px, py);
             if sev > 1.5 {
-                self.sim.emit(Event::CrashStatic { vehicle: a, severity: sev, x: px, y: py });
+                self.sim.emit(Event::CrashStatic {
+                    vehicle: a,
+                    severity: sev,
+                    x: px,
+                    y: py,
+                });
             }
-            let chasing = self.sim.vehicles[ai].driver().is_some_and(|d| d.state == DriverState::Chasing);
+            let chasing = self.sim.vehicles[ai]
+                .driver()
+                .is_some_and(|d| d.state == DriverState::Chasing);
             if was_lane || (sev > 3.0 && chasing) {
                 self.sim.with_driver(ai, |d, sim| d.on_crash(sim, ai, sev));
             }

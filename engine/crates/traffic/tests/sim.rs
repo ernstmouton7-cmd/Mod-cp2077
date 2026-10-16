@@ -8,7 +8,12 @@ use std::time::Instant;
 
 #[test]
 fn city_traffic_flows_for_3_simulated_minutes_without_blowing_up() {
-    let mut world = World::new(WorldOptions { seed: 42, traffic: 110, start_hour: 17.5, ..Default::default() });
+    let mut world = World::new(WorldOptions {
+        seed: 42,
+        traffic: 110,
+        start_hour: 17.5,
+        ..Default::default()
+    });
     let mut events = Vec::new();
     let t0 = Instant::now();
     for _ in 0..180 * 60 {
@@ -20,7 +25,11 @@ fn city_traffic_flows_for_3_simulated_minutes_without_blowing_up() {
     let mut total_odo = 0.0;
     let mut states: BTreeMap<String, usize> = BTreeMap::new();
     for v in world.vehicles() {
-        assert!(v.x.is_finite() && v.y.is_finite(), "vehicle {:?} has NaN position", v.id);
+        assert!(
+            v.x.is_finite() && v.y.is_finite(),
+            "vehicle {:?} has NaN position",
+            v.id
+        );
         if v.odometer > 100.0 {
             moving += 1;
         }
@@ -37,6 +46,12 @@ fn city_traffic_flows_for_3_simulated_minutes_without_blowing_up() {
     println!("sim 180s in {ms}ms; vehicles={n} moving={moving} physicsAI={physics} avgSpeed={:.1}km/h collisions={}", avg_speed * 3.6, world.stats().collisions);
     println!("events {:?}", common::count(&events));
     println!("states {states:?}");
-    assert!(moving as f64 > n as f64 * 0.6, "only {moving} vehicles moved");
-    assert!(common::count(&events).get("signal").copied().unwrap_or(0) > 20, "signals should cycle");
+    assert!(
+        moving as f64 > n as f64 * 0.6,
+        "only {moving} vehicles moved"
+    );
+    assert!(
+        common::count(&events).get("signal").copied().unwrap_or(0) > 20,
+        "signals should cycle"
+    );
 }

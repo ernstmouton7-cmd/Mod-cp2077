@@ -74,7 +74,11 @@ impl Default for PlayerDriver {
 impl PlayerDriver {
     pub fn new() -> Self {
         PlayerDriver {
-            settings: PlayerSettings { clutch_assist: true, auto_reverse: true, steer_sensitivity: 1.0 },
+            settings: PlayerSettings {
+                clutch_assist: true,
+                auto_reverse: true,
+                steer_sensitivity: 1.0,
+            },
             cruise: CruiseState::default(),
             limiter_on: false,
             seatbelt: true,
@@ -96,7 +100,11 @@ impl PlayerDriver {
                 return "P".into();
             }
             let l = v.pt.gear_label();
-            return if l == "R" || l == "N" { l } else { format!("D{l}") };
+            return if l == "R" || l == "N" {
+                l
+            } else {
+                format!("D{l}")
+            };
         }
         v.pt.gear_label()
     }
@@ -109,7 +117,15 @@ impl PlayerDriver {
     }
 
     /// Apply one control frame to the player's vehicle.
-    pub fn update(&mut self, dt: f64, f: &ControlFrame, v: &mut Vehicle, events: &mut EventQueue, dark: bool, speed_limit: f64) {
+    pub fn update(
+        &mut self,
+        dt: f64,
+        f: &ControlFrame,
+        v: &mut Vehicle,
+        events: &mut EventQueue,
+        dark: bool,
+        speed_limit: f64,
+    ) {
         self.gesture = None;
         self.clutch_now = f.clutch;
         for &id in &f.pressed {
@@ -120,7 +136,10 @@ impl PlayerDriver {
         let horn_held = f.held.contains(&ActionId::Horn);
         if horn_held && !v.lights.horn {
             v.lights.horn_presses += 1;
-            events.emit(Event::Horn { vehicle: vid, long: false });
+            events.emit(Event::Horn {
+                vehicle: vid,
+                long: false,
+            });
         }
         v.lights.horn = horn_held;
         let flash_held = f.held.contains(&ActionId::Flash);
@@ -130,7 +149,10 @@ impl PlayerDriver {
         v.lights.flash = flash_held;
         for &(id, held) in &f.released {
             if id == ActionId::Horn && held > 0.9 {
-                events.emit(Event::Horn { vehicle: vid, long: true });
+                events.emit(Event::Horn {
+                    vehicle: vid,
+                    long: true,
+                });
             }
         }
 
@@ -188,12 +210,15 @@ impl PlayerDriver {
         } else {
             // Manual gearbox.
             if self.settings.clutch_assist && f.clutch < 0.05 {
-                let wheel_rpm = (v.dynamics.driven_omega() * pt.ratio(pt.gear) * v.spec.final_drive).abs() * 9.549;
+                let wheel_rpm =
+                    (v.dynamics.driven_omega() * pt.ratio(pt.gear) * v.spec.final_drive).abs()
+                        * 9.549;
                 let idle = v.spec.idle_rpm;
                 if pt.shifting() {
                     pt.clutch_pedal = 1.0;
                 } else if pt.gear != 0 && wheel_rpm < idle * 1.15 {
-                    pt.clutch_pedal = clamp(1.0 - throttle * 1.6 - (wheel_rpm / idle) * 0.5, 0.0, 1.0);
+                    pt.clutch_pedal =
+                        clamp(1.0 - throttle * 1.6 - (wheel_rpm / idle) * 0.5, 0.0, 1.0);
                 } else {
                     pt.clutch_pedal = 0.0;
                 }
@@ -225,14 +250,27 @@ impl PlayerDriver {
                 throttle = throttle.max(cmd);
             }
         }
-        v.pt.limiter = if self.limiter_on { speed_limit.max(5.0) } else { 0.0 };
+        v.pt.limiter = if self.limiter_on {
+            speed_limit.max(5.0)
+        } else {
+            0.0
+        };
 
-        v.inputs.throttle = if v.pt.running || v.pt.cranking > 0.0 { throttle } else { 0.0 };
+        v.inputs.throttle = if v.pt.running || v.pt.cranking > 0.0 {
+            throttle
+        } else {
+            0.0
+        };
         v.inputs.brake = brake;
-        v.inputs.handbrake = if self.parked && v.pt.mode == TransmissionMode::Automatic { 1.0 } else { f.handbrake };
+        v.inputs.handbrake = if self.parked && v.pt.mode == TransmissionMode::Automatic {
+            1.0
+        } else {
+            f.handbrake
+        };
         // Steering: full lock at parking speeds, reduced at speed.
         let speed_factor = 1.0 / (1.0 + u.abs() / 35.0);
-        v.steer_target = -f.steer * v.spec.max_steer * speed_factor * self.settings.steer_sensitivity;
+        v.steer_target =
+            -f.steer * v.spec.max_steer * speed_factor * self.settings.steer_sensitivity;
 
         v.lights.brake = if v.inputs.brake > 0.05 { 1.0 } else { 0.0 };
         v.lights.reverse = v.pt.gear == -1;
@@ -243,24 +281,39 @@ impl PlayerDriver {
             if self.seatbelt_chime <= 0.0 {
                 self.seatbelt_chime = 6.0;
                 self.note("Fasten seatbelt (B)".into());
-                events.emit(Event::Chime { vehicle: vid, reason: "seatbelt" });
+                events.emit(Event::Chime {
+                    vehicle: vid,
+                    reason: "seatbelt",
+                });
             }
         }
     }
 
     /// Manual box without clutch assist: shifting with the clutch out grinds.
     fn grinds(&self, v: &Vehicle) -> bool {
-        v.pt.mode == TransmissionMode::Manual && !self.settings.clutch_assist && v.pt.running && self.clutch_now < 0.5
+        v.pt.mode == TransmissionMode::Manual
+            && !self.settings.clutch_assist
+            && v.pt.running
+            && self.clutch_now < 0.5
     }
 
-    fn on_press(&mut self, id: ActionId, v: &mut Vehicle, events: &mut EventQueue, speed_limit: f64) {
+    fn on_press(
+        &mut self,
+        id: ActionId,
+        v: &mut Vehicle,
+        events: &mut EventQueue,
+        speed_limit: f64,
+    ) {
         let vid = v.id;
         match id {
             ActionId::ShiftUp => {
                 if self.grinds(v) {
                     events.emit(Event::Grind { vehicle: vid });
                 } else if v.pt.mode == TransmissionMode::Manual && v.pt.shift_up() {
-                    events.emit(Event::Shift { vehicle: vid, gear: v.pt.gear_label() });
+                    events.emit(Event::Shift {
+                        vehicle: vid,
+                        gear: v.pt.gear_label(),
+                    });
                 } else if v.pt.mode == TransmissionMode::Automatic && v.pt.gear <= 0 {
                     self.parked = false;
                     v.pt.shift_to(1);
@@ -270,7 +323,10 @@ impl PlayerDriver {
                 if self.grinds(v) {
                     events.emit(Event::Grind { vehicle: vid });
                 } else if v.pt.mode == TransmissionMode::Manual && v.pt.shift_down() {
-                    events.emit(Event::Shift { vehicle: vid, gear: v.pt.gear_label() });
+                    events.emit(Event::Shift {
+                        vehicle: vid,
+                        gear: v.pt.gear_label(),
+                    });
                 } else if v.pt.mode == TransmissionMode::Automatic && v.dynamics.u.abs() < 0.5 {
                     self.parked = true;
                 }
@@ -286,12 +342,23 @@ impl PlayerDriver {
                 v.pt.shift_to(0);
             }
             ActionId::TransmissionMode => {
-                v.pt.mode = if v.pt.mode == TransmissionMode::Automatic { TransmissionMode::Manual } else { TransmissionMode::Automatic };
+                v.pt.mode = if v.pt.mode == TransmissionMode::Automatic {
+                    TransmissionMode::Manual
+                } else {
+                    TransmissionMode::Automatic
+                };
                 self.parked = false;
                 if v.pt.mode == TransmissionMode::Automatic && v.pt.gear == 0 {
                     v.pt.shift_to(1);
                 }
-                self.note(if v.pt.mode == TransmissionMode::Manual { "Manual transmission" } else { "Automatic transmission" }.into());
+                self.note(
+                    if v.pt.mode == TransmissionMode::Manual {
+                        "Manual transmission"
+                    } else {
+                        "Automatic transmission"
+                    }
+                    .into(),
+                );
             }
             ActionId::IndicatorLeft => v.lights.toggle_indicator(Indicator::Left),
             ActionId::IndicatorRight => v.lights.toggle_indicator(Indicator::Right),
@@ -315,8 +382,15 @@ impl PlayerDriver {
                     self.cruise.on = false;
                     self.note("Cruise off".into());
                 } else if v.dynamics.u > 30.0 * KMH * 0.5 && v.pt.running {
-                    self.cruise = CruiseState { on: true, target: v.dynamics.u, integral: 0.0 };
-                    self.note(format!("Cruise set {} km/h", (self.cruise.target * 3.6 + 0.5).floor()));
+                    self.cruise = CruiseState {
+                        on: true,
+                        target: v.dynamics.u,
+                        integral: 0.0,
+                    };
+                    self.note(format!(
+                        "Cruise set {} km/h",
+                        (self.cruise.target * 3.6 + 0.5).floor()
+                    ));
                 } else {
                     self.note("Cruise needs at least 15 km/h".into());
                 }
@@ -324,33 +398,56 @@ impl PlayerDriver {
             ActionId::CruiseUp => {
                 if self.cruise.on {
                     self.cruise.target += 5.0 * KMH;
-                    self.note(format!("Cruise {} km/h", (self.cruise.target * 3.6 + 0.5).floor()));
+                    self.note(format!(
+                        "Cruise {} km/h",
+                        (self.cruise.target * 3.6 + 0.5).floor()
+                    ));
                 }
             }
             ActionId::CruiseDown => {
                 if self.cruise.on {
                     self.cruise.target = (15.0 * KMH).max(self.cruise.target - 5.0 * KMH);
-                    self.note(format!("Cruise {} km/h", (self.cruise.target * 3.6 + 0.5).floor()));
+                    self.note(format!(
+                        "Cruise {} km/h",
+                        (self.cruise.target * 3.6 + 0.5).floor()
+                    ));
                 }
             }
             ActionId::Limiter => {
                 self.limiter_on = !self.limiter_on;
-                let n = if self.limiter_on { format!("Limiter {} km/h", (speed_limit * 3.6 + 0.5).floor()) } else { "Limiter off".into() };
+                let n = if self.limiter_on {
+                    format!("Limiter {} km/h", (speed_limit * 3.6 + 0.5).floor())
+                } else {
+                    "Limiter off".into()
+                };
                 self.note(n);
             }
             ActionId::Engine => {
                 if v.pt.running {
                     v.pt.stop();
-                    events.emit(Event::Engine { vehicle: vid, on: false });
+                    events.emit(Event::Engine {
+                        vehicle: vid,
+                        on: false,
+                    });
                     self.note("Engine off".into());
                 } else {
                     v.pt.start();
-                    events.emit(Event::Engine { vehicle: vid, on: true });
+                    events.emit(Event::Engine {
+                        vehicle: vid,
+                        on: true,
+                    });
                 }
             }
             ActionId::Seatbelt => {
                 self.seatbelt = !self.seatbelt;
-                self.note(if self.seatbelt { "Seatbelt fastened" } else { "Seatbelt unfastened" }.into());
+                self.note(
+                    if self.seatbelt {
+                        "Seatbelt fastened"
+                    } else {
+                        "Seatbelt unfastened"
+                    }
+                    .into(),
+                );
             }
             ActionId::ToggleAbs => {
                 v.assists.abs = !v.assists.abs;
@@ -358,11 +455,17 @@ impl PlayerDriver {
             }
             ActionId::ToggleTcs => {
                 v.assists.tcs = !v.assists.tcs;
-                self.note(format!("Traction control {}", if v.assists.tcs { "on" } else { "off" }));
+                self.note(format!(
+                    "Traction control {}",
+                    if v.assists.tcs { "on" } else { "off" }
+                ));
             }
             ActionId::ToggleEsc => {
                 v.assists.esc = !v.assists.esc;
-                self.note(format!("Stability control {}", if v.assists.esc { "on" } else { "off" }));
+                self.note(format!(
+                    "Stability control {}",
+                    if v.assists.esc { "on" } else { "off" }
+                ));
             }
             ActionId::Apologize => self.gesture = Some(GestureKind::Wave),
             ActionId::RudeGesture => self.gesture = Some(GestureKind::Rude),

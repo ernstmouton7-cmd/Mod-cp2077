@@ -75,7 +75,10 @@ pub struct Occupancy {
 
 impl Occupancy {
     pub fn new(lanes: usize, connectors: usize) -> Self {
-        Occupancy { lanes: vec![Vec::new(); lanes], connectors: vec![Vec::new(); connectors] }
+        Occupancy {
+            lanes: vec![Vec::new(); lanes],
+            connectors: vec![Vec::new(); connectors],
+        }
     }
 
     /// Reset every segment (start of a step).

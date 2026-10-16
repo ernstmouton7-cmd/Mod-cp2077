@@ -127,7 +127,12 @@ pub struct SignalOptions {
 
 impl Default for SignalOptions {
     fn default() -> Self {
-        SignalOptions { mode: SignalMode::Actuated, offset: 0.0, allow_right_on_red: true, cycle_scale: 1.0 }
+        SignalOptions {
+            mode: SignalMode::Actuated,
+            offset: 0.0,
+            allow_right_on_red: true,
+            cycle_scale: 1.0,
+        }
     }
 }
 
@@ -222,7 +227,13 @@ impl SignalController {
         let mut best_w = -1.0;
         let mut main = 0;
         for (gi, g) in groups.iter().enumerate() {
-            let w: f64 = g.iter().map(|&a| net.approach(a).lanes.len() as f64 * (net.road(net.approach(a).road).speed_limit + 1.0)).sum();
+            let w: f64 = g
+                .iter()
+                .map(|&a| {
+                    net.approach(a).lanes.len() as f64
+                        * (net.road(net.approach(a).road).speed_limit + 1.0)
+                })
+                .sum();
             if w > best_w {
                 best_w = w;
                 main = gi;
@@ -236,11 +247,19 @@ impl SignalController {
                 net.approaches[a.idx()].group = gi as i32;
             }
             let is_main = gi == main;
-            let speed = g.iter().map(|&a| net.road(net.approach(a).road).speed_limit).fold(f64::NEG_INFINITY, f64::max);
+            let speed = g
+                .iter()
+                .map(|&a| net.road(net.approach(a).road).speed_limit)
+                .fold(f64::NEG_INFINITY, f64::max);
             let yellow = clamp(1.0 + speed / (2.0 * 3.05), 3.0, 5.5);
             let cross_width = self.node_radius * 2.0;
             let all_red = clamp((cross_width + 5.0) / speed.max(8.0), 1.0, 2.5);
-            let has_dedicated_left = g.iter().any(|&a| net.approach(a).lanes.iter().any(|&l| net.lane(l).turns == [TurnType::Left]));
+            let has_dedicated_left = g.iter().any(|&a| {
+                net.approach(a)
+                    .lanes
+                    .iter()
+                    .any(|&l| net.lane(l).turns == [TurnType::Left])
+            });
             let conns_of = |net: &Network| -> Vec<ConnectorId> {
                 let mut v = Vec::new();
                 for &a in g {
@@ -254,11 +273,17 @@ impl SignalController {
             if has_dedicated_left && g.len() > 1 {
                 let mut serves = Vec::new();
                 for &c in &all {
-                    if net.connector(c).turn == TurnType::Left && !serves.iter().any(|s: &(ConnectorId, Right)| s.0 == c) {
+                    if net.connector(c).turn == TurnType::Left
+                        && !serves.iter().any(|s: &(ConnectorId, Right)| s.0 == c)
+                    {
                         serves.push((c, Right::Green));
                     }
                 }
-                let demand_order = all.iter().copied().filter(|c| serves.iter().any(|s| s.0 == *c)).collect();
+                let demand_order = all
+                    .iter()
+                    .copied()
+                    .filter(|c| serves.iter().any(|s| s.0 == *c))
+                    .collect();
                 self.phases.push(Phase {
                     name: format!("G{gi}-left"),
                     serves,
@@ -341,7 +366,10 @@ impl SignalController {
 
     /// Cycle length of the fixed plan (s).
     pub fn cycle_length(&self) -> f64 {
-        self.phases.iter().map(|p| p.fixed_green + p.yellow + p.all_red).sum()
+        self.phases
+            .iter()
+            .map(|p| p.fixed_green + p.yellow + p.all_red)
+            .sum()
     }
 
     pub fn set_mode(&mut self, mode: SignalMode) {
@@ -378,13 +406,21 @@ impl SignalController {
     }
 
     fn change(&self) -> SignalChange {
-        SignalChange { node: self.node, phase: self.current_phase().name.clone(), state: self.state }
+        SignalChange {
+            node: self.node,
+            phase: self.current_phase().name.clone(),
+            state: self.state,
+        }
     }
 
     fn pick_next_phase(&self, demand: Option<&dyn Fn(ConnectorId) -> f64>) -> usize {
         let n = self.phases.len();
         if let Some(ap) = self.preempt_approach {
-            if let Some(k) = self.phases.iter().position(|p| Self::phase_serves_approach(p, ap)) {
+            if let Some(k) = self
+                .phases
+                .iter()
+                .position(|p| Self::phase_serves_approach(p, ap))
+            {
                 return k;
             }
         }
@@ -431,12 +467,19 @@ impl SignalController {
     }
 
     fn others_waiting(&self, demand: Option<&dyn Fn(ConnectorId) -> f64>) -> bool {
-        self.phases.iter().enumerate().any(|(k, p)| k != self.phase_index && Self::phase_demand(p, demand) > 0.0)
+        self.phases
+            .iter()
+            .enumerate()
+            .any(|(k, p)| k != self.phase_index && Self::phase_demand(p, demand) > 0.0)
     }
 
     /// Advance by `dt`. `demand` returns the detector count for a connector
     /// (`None` = demand everywhere). Returns the interval change, if any.
-    pub fn update(&mut self, dt: f64, demand: Option<&dyn Fn(ConnectorId) -> f64>) -> Option<SignalChange> {
+    pub fn update(
+        &mut self,
+        dt: f64,
+        demand: Option<&dyn Fn(ConnectorId) -> f64>,
+    ) -> Option<SignalChange> {
         self.flash_clock += dt;
         if self.preempt_ttl > 0.0 {
             self.preempt_ttl -= dt;
@@ -489,7 +532,11 @@ impl SignalController {
         match self.mode {
             SignalMode::Off => return Indication::Dark,
             SignalMode::Flashing => {
-                return if self.is_main(c.approach) { Indication::FlashYellow } else { Indication::FlashRed };
+                return if self.is_main(c.approach) {
+                    Indication::FlashYellow
+                } else {
+                    Indication::FlashRed
+                };
             }
             _ => {}
         }
@@ -510,7 +557,13 @@ impl SignalController {
 
     /// Signal-head display for an approach.
     pub fn head(&self, a: ApproachId) -> HeadState {
-        let mut out = HeadState { ball: Lamp::Red, arrow: None, ball_flashing: false, ped: PedLamp::Dont, ped_countdown: 0.0 };
+        let mut out = HeadState {
+            ball: Lamp::Red,
+            arrow: None,
+            ball_flashing: false,
+            ped: PedLamp::Dont,
+            ped_countdown: 0.0,
+        };
         let has_arrow = self.arrow_approaches.contains(&a);
         if has_arrow {
             out.arrow = Some(Lamp::Off);
@@ -557,7 +610,11 @@ impl SignalController {
         // Pedestrians cross parallel to this approach while its through phase is green.
         if in_phase && !p.is_left_arrow && self.state == PhaseState::Green {
             let clearance = self.ped_clearance();
-            let green_left = if self.mode == SignalMode::Fixed { p.fixed_green - self.t } else { p.min_green.max(clearance + self.ped_walk_time) - self.t };
+            let green_left = if self.mode == SignalMode::Fixed {
+                p.fixed_green - self.t
+            } else {
+                p.min_green.max(clearance + self.ped_walk_time) - self.t
+            };
             if self.t < self.ped_walk_time {
                 out.ped = PedLamp::Walk;
             } else if green_left > 0.0 {

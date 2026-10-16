@@ -66,8 +66,16 @@ pub fn build_crosswalks(net: &Network) -> (Vec<Crosswalk>, Vec<Vec<CrosswalkCros
     }
     let mut crossings = vec![Vec::new(); net.connectors.len()];
     for c in &net.connectors {
-        let mut list: Vec<CrosswalkCrossing> = crosswalks.iter().filter(|cw| cw.node == c.node).filter_map(|cw| first_crossing(c, cw)).collect();
-        list.sort_by(|a, b| a.s.partial_cmp(&b.s).unwrap_or(std::cmp::Ordering::Equal).then(a.cw.cmp(&b.cw)));
+        let mut list: Vec<CrosswalkCrossing> = crosswalks
+            .iter()
+            .filter(|cw| cw.node == c.node)
+            .filter_map(|cw| first_crossing(c, cw))
+            .collect();
+        list.sort_by(|a, b| {
+            a.s.partial_cmp(&b.s)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.cw.cmp(&b.cw))
+        });
         crossings[c.id.idx()] = list;
     }
     (crosswalks, crossings)
@@ -76,8 +84,21 @@ pub fn build_crosswalks(net: &Network) -> (Vec<Crosswalk>, Vec<Vec<CrosswalkCros
 fn first_crossing(c: &Connector, cw: &Crosswalk) -> Option<CrosswalkCrossing> {
     let p = &c.path;
     for i in 0..p.xs.len() - 1 {
-        if let Some((t, u)) = segment_intersect(p.xs[i], p.ys[i], p.xs[i + 1], p.ys[i + 1], cw.ax, cw.ay, cw.bx, cw.by) {
-            return Some(CrosswalkCrossing { cw: cw.id, s: p.cum[i] + t * (p.cum[i + 1] - p.cum[i]), t: u });
+        if let Some((t, u)) = segment_intersect(
+            p.xs[i],
+            p.ys[i],
+            p.xs[i + 1],
+            p.ys[i + 1],
+            cw.ax,
+            cw.ay,
+            cw.bx,
+            cw.by,
+        ) {
+            return Some(CrosswalkCrossing {
+                cw: cw.id,
+                s: p.cum[i] + t * (p.cum[i + 1] - p.cum[i]),
+                t: u,
+            });
         }
     }
     None

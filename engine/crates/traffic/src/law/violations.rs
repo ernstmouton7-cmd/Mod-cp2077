@@ -73,10 +73,18 @@ impl ViolationKind {
 
     /// The violation table (same values as `law/violations.ts`).
     pub fn def(self) -> ViolationDef {
-        let d = |label, fine, points, heat, cooldown| ViolationDef { label, fine, points, heat, cooldown };
+        let d = |label, fine, points, heat, cooldown| ViolationDef {
+            label,
+            fine,
+            points,
+            heat,
+            cooldown,
+        };
         match self {
             ViolationKind::RedLight => d("Ran a red light", 400.0, 3, 1.0, 4.0),
-            ViolationKind::RightOnRedNoStop => d("Right on red without stopping", 150.0, 1, 1.0, 4.0),
+            ViolationKind::RightOnRedNoStop => {
+                d("Right on red without stopping", 150.0, 1, 1.0, 4.0)
+            }
             ViolationKind::StopSign => d("Failed to stop at stop sign", 200.0, 2, 1.0, 4.0),
             ViolationKind::SpeedingMinor => d("Speeding (10–25% over)", 120.0, 1, 1.0, 25.0),
             ViolationKind::SpeedingMajor => d("Speeding (25–50% over)", 350.0, 3, 1.0, 25.0),
@@ -90,13 +98,17 @@ impl ViolationKind {
             ViolationKind::IllegalTurn => d("Illegal turn", 200.0, 2, 1.0, 8.0),
             ViolationKind::NoHeadlights => d("No headlights after dark", 90.0, 1, 1.0, 60.0),
             ViolationKind::Seatbelt => d("Not wearing a seatbelt", 70.0, 0, 1.0, 60.0),
-            ViolationKind::FailYieldEmergency => d("Failure to yield to emergency vehicle", 450.0, 3, 2.0, 30.0),
+            ViolationKind::FailYieldEmergency => {
+                d("Failure to yield to emergency vehicle", 450.0, 3, 2.0, 30.0)
+            }
             ViolationKind::Tailgating => d("Following too closely", 120.0, 2, 1.0, 20.0),
             ViolationKind::Reckless => d("Reckless driving", 800.0, 5, 2.0, 20.0),
             ViolationKind::BlockingBox => d("Blocking the intersection", 150.0, 1, 1.0, 20.0),
             ViolationKind::HornAbuse => d("Unnecessary use of horn", 50.0, 0, 1.0, 30.0),
             ViolationKind::Evading => d("Evading police", 2500.0, 8, 3.0, 60.0),
-            ViolationKind::FailYieldPedestrian => d("Failure to yield to a pedestrian", 350.0, 3, 1.0, 8.0),
+            ViolationKind::FailYieldPedestrian => {
+                d("Failure to yield to a pedestrian", 350.0, 3, 1.0, 8.0)
+            }
             ViolationKind::HitPedestrian => d("Hit a pedestrian", 5000.0, 8, 3.0, 5.0),
         }
     }
@@ -110,7 +122,11 @@ pub enum Witness {
     None,
 }
 
-const SPEED_TIERS: [ViolationKind; 3] = [ViolationKind::SpeedingMinor, ViolationKind::SpeedingMajor, ViolationKind::SpeedingExtreme];
+const SPEED_TIERS: [ViolationKind; 3] = [
+    ViolationKind::SpeedingMinor,
+    ViolationKind::SpeedingMajor,
+    ViolationKind::SpeedingExtreme,
+];
 
 /// One logged violation.
 #[derive(Clone, Debug, PartialEq)]
@@ -184,7 +200,9 @@ impl DrivingRecord {
     pub fn can_charge(&self, kind: ViolationKind, now: f64) -> bool {
         if let Some(tier) = SPEED_TIERS.iter().position(|&k| k == kind) {
             for (i, k) in SPEED_TIERS.iter().enumerate() {
-                let Some(&t) = self.last_charged.get(k) else { continue };
+                let Some(&t) = self.last_charged.get(k) else {
+                    continue;
+                };
                 let age = now - t;
                 if i >= tier && age < kind.def().cooldown {
                     return false;
@@ -203,10 +221,27 @@ impl DrivingRecord {
 
     /// Log a violation. Camera violations are charged at once, police ones
     /// wait for a ticket. Returns a copy of the record.
-    pub fn add(&mut self, kind: ViolationKind, now: f64, witness: Witness, x: f64, y: f64) -> ViolationRecord {
+    pub fn add(
+        &mut self,
+        kind: ViolationKind,
+        now: f64,
+        witness: Witness,
+        x: f64,
+        y: f64,
+    ) -> ViolationRecord {
         let d = kind.def();
         self.last_charged.insert(kind, now);
-        let mut rec = ViolationRecord { kind, label: d.label, time: now, fine: d.fine, points: d.points, witness, paid: false, x, y };
+        let mut rec = ViolationRecord {
+            kind,
+            label: d.label,
+            time: now,
+            fine: d.fine,
+            points: d.points,
+            witness,
+            paid: false,
+            x,
+            y,
+        };
         self.clean_distance = 0.0;
         match witness {
             Witness::Camera => {
@@ -249,12 +284,21 @@ impl DrivingRecord {
         let total = self.charge(&mut recs);
         // Mark the matching history entries as paid.
         for r in &recs {
-            if let Some(h) = self.history.iter_mut().rev().find(|h| !h.paid && h.kind == r.kind && h.time == r.time) {
+            if let Some(h) = self
+                .history
+                .iter_mut()
+                .rev()
+                .find(|h| !h.paid && h.kind == r.kind && h.time == r.time)
+            {
                 h.paid = true;
             }
         }
         self.tickets_issued += 1;
-        TicketSummary { total, points: pts, count: recs.len() }
+        TicketSummary {
+            total,
+            points: pts,
+            count: recs.len(),
+        }
     }
 
     /// Points expire slowly with clean driving (1 point per 2 km).

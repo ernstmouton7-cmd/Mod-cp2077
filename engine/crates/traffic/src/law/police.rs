@@ -60,7 +60,8 @@ impl Default for PoliceSystem {
 }
 
 fn player_pos(sim: &Sim) -> Option<(VehicleId, f64, f64)> {
-    sim.player_idx().map(|i| (sim.vehicles[i].id, sim.vehicles[i].x, sim.vehicles[i].y))
+    sim.player_idx()
+        .map(|i| (sim.vehicles[i].id, sim.vehicles[i].x, sim.vehicles[i].y))
 }
 
 impl PoliceSystem {
@@ -73,17 +74,44 @@ impl PoliceSystem {
     }
 
     /// An officer (`unit`) saw the player commit a violation worth `heat`.
-    pub fn report(&mut self, sim: &mut Sim, spawner: &Spawner, unit: Option<VehicleId>, rec: &mut DrivingRecord, heat: f64) {
-        let Some((_, px, py)) = player_pos(sim) else { return };
-        rec.heat = 5f64.min(rec.heat.max(if self.stage == PoliceStage::Pursuit { rec.heat + heat * 0.5 } else { heat }));
-        sim.emit(Event::Heat { level: rec.heat.floor() as u32, reason: "violation witnessed" });
+    pub fn report(
+        &mut self,
+        sim: &mut Sim,
+        spawner: &Spawner,
+        unit: Option<VehicleId>,
+        rec: &mut DrivingRecord,
+        heat: f64,
+    ) {
+        let Some((_, px, py)) = player_pos(sim) else {
+            return;
+        };
+        rec.heat = 5f64.min(rec.heat.max(if self.stage == PoliceStage::Pursuit {
+            rec.heat + heat * 0.5
+        } else {
+            heat
+        }));
+        sim.emit(Event::Heat {
+            level: rec.heat.floor() as u32,
+            reason: "violation witnessed",
+        });
         if self.stage == PoliceStage::None {
-            let Some(u) = unit.or_else(|| self.nearest_free_unit(sim, px, py)) else { return };
+            let Some(u) = unit.or_else(|| self.nearest_free_unit(sim, px, py)) else {
+                return;
+            };
             self.assign(sim, u);
             self.stage = PoliceStage::Responding;
             self.timer = 0.0;
-            sim.emit(Event::Dispatch { unit: u, kind: DispatchKind::Police, x: px, y: py, reason: "traffic violation" });
-        } else if self.stage == PoliceStage::Pursuit && rec.heat >= 3.0 && (self.units.len() as f64) < rec.heat.floor() {
+            sim.emit(Event::Dispatch {
+                unit: u,
+                kind: DispatchKind::Police,
+                x: px,
+                y: py,
+                reason: "traffic violation",
+            });
+        } else if self.stage == PoliceStage::Pursuit
+            && rec.heat >= 3.0
+            && (self.units.len() as f64) < rec.heat.floor()
+        {
             self.add_unit(sim, spawner);
         }
     }
@@ -92,7 +120,8 @@ impl PoliceSystem {
         let mut best = None;
         let mut bd = f64::INFINITY;
         for v in &sim.vehicles {
-            if v.role != VehicleRole::Police || !v.alive || v.wrecked || self.units.contains(&v.id) {
+            if v.role != VehicleRole::Police || !v.alive || v.wrecked || self.units.contains(&v.id)
+            {
                 continue;
             }
             let d = (v.x - x) * (v.x - x) + (v.y - y) * (v.y - y);
@@ -116,21 +145,43 @@ impl PoliceSystem {
     }
 
     fn add_unit(&mut self, sim: &mut Sim, spawner: &Spawner) {
-        let Some((_, px, py)) = player_pos(sim) else { return };
+        let Some((_, px, py)) = player_pos(sim) else {
+            return;
+        };
         let mut u = self.nearest_free_unit(sim, px, py);
-        let too_far = u.and_then(|id| sim.vehicle(id)).is_none_or(|v| hypot(v.x - px, v.y - py) > 400.0);
+        let too_far = u
+            .and_then(|id| sim.vehicle(id))
+            .is_none_or(|v| hypot(v.x - px, v.y - py) > 400.0);
         if too_far {
             // Spawn a patrol car out of sight.
-            u = spawner.find_spot(sim, 120.0, 400.0).map(|(lane, s)| spawner.create(sim, VehicleClass::Police, VehicleRole::Police, lane, s, 8.0, None));
+            u = spawner.find_spot(sim, 120.0, 400.0).map(|(lane, s)| {
+                spawner.create(
+                    sim,
+                    VehicleClass::Police,
+                    VehicleRole::Police,
+                    lane,
+                    s,
+                    8.0,
+                    None,
+                )
+            });
         }
         let Some(u) = u else { return };
         self.assign(sim, u);
-        sim.emit(Event::Dispatch { unit: u, kind: DispatchKind::Police, x: px, y: py, reason: "backup" });
+        sim.emit(Event::Dispatch {
+            unit: u,
+            kind: DispatchKind::Police,
+            x: px,
+            y: py,
+            reason: "backup",
+        });
     }
 
     fn release(&mut self, sim: &mut Sim) {
         for &u in &self.units {
-            let Some(v) = sim.vehicle_mut(u) else { continue };
+            let Some(v) = sim.vehicle_mut(u) else {
+                continue;
+            };
             let physics = v.mode == MotionMode::Physics;
             if let Some(d) = v.driver_mut() {
                 d.emergency = false;
@@ -168,12 +219,16 @@ impl PoliceSystem {
             return;
         }
         // Drop wrecked units.
-        self.units.retain(|&u| sim.vehicle(u).is_some_and(|v| v.alive && !v.wrecked));
+        self.units
+            .retain(|&u| sim.vehicle(u).is_some_and(|v| v.alive && !v.wrecked));
         if self.units.is_empty() {
             if self.stage == PoliceStage::Pursuit || self.stage == PoliceStage::Searching {
                 self.add_unit(sim, spawner);
                 if self.units.is_empty() {
-                    sim.emit(Event::Pullover { police: None, stage: PulloverStage::Escaped });
+                    sim.emit(Event::Pullover {
+                        police: None,
+                        stage: PulloverStage::Escaped,
+                    });
                     rec.heat = 0.0;
                     self.release(sim);
                 }
@@ -227,13 +282,21 @@ impl PoliceSystem {
                 }
             }
             let follow = sim.vehicles[vi].driver().and_then(|d| d.follow_target);
-            if follow.is_none() && sim.vehicles[vi].mode == MotionMode::Lane && self.route_timer <= 0.0 {
+            if follow.is_none()
+                && sim.vehicles[vi].mode == MotionMode::Lane
+                && self.route_timer <= 0.0
+            {
                 let hits = sim.net.nearest_lanes(px, py, 25.0);
                 if let Some(h) = hits.first() {
                     let lane = sim.net.lane(h.lane);
                     let (road, fwd) = (lane.road, lane.forward);
                     let cur = sim.vehicles[vi].seg;
-                    let Sim { net, router, vehicles, .. } = &mut *sim;
+                    let Sim {
+                        net,
+                        router,
+                        vehicles,
+                        ..
+                    } = &mut *sim;
                     if let Some(d) = vehicles[vi].driver_mut() {
                         d.route_to(net, router, cur, road, fwd);
                     }
@@ -246,13 +309,22 @@ impl PoliceSystem {
 
         match self.stage {
             PoliceStage::Responding => {
-                let following = sim.driver(lead).is_some_and(|d| d.follow_target == Some(pid));
+                let following = sim
+                    .driver(lead)
+                    .is_some_and(|d| d.follow_target == Some(pid));
                 if following {
                     self.stage = PoliceStage::Pullover;
                     self.timer = 0.0;
-                    sim.emit(Event::Pullover { police: Some(lead), stage: PulloverStage::Request });
+                    sim.emit(Event::Pullover {
+                        police: Some(lead),
+                        stage: PulloverStage::Request,
+                    });
                     let line = self.rng.pick(&POLICE_LINES);
-                    sim.emit(Event::Speech { vehicle: lead, text: line.into(), mood: Mood::Calm });
+                    sim.emit(Event::Speech {
+                        vehicle: lead,
+                        text: line.into(),
+                        mood: Mood::Calm,
+                    });
                 } else if self.timer > 90.0 {
                     rec.heat = 0.0;
                     self.release(sim);
@@ -273,17 +345,30 @@ impl PoliceSystem {
                     self.stage = PoliceStage::Stopped;
                     self.timer = 0.0;
                     self.ticket_countdown = 6.0;
-                    sim.emit(Event::Pullover { police: Some(lead), stage: PulloverStage::Stopped });
+                    sim.emit(Event::Pullover {
+                        police: Some(lead),
+                        stage: PulloverStage::Stopped,
+                    });
                 } else if self.flee_time > 6.0 {
                     self.stage = PoliceStage::Pursuit;
                     self.pursuit_time = 0.0;
-                    sim.emit(Event::Pullover { police: Some(lead), stage: PulloverStage::Fled });
+                    sim.emit(Event::Pullover {
+                        police: Some(lead),
+                        stage: PulloverStage::Fled,
+                    });
                     rec.heat = rec.heat.max(2.0);
-                    sim.emit(Event::Heat { level: rec.heat.floor() as u32, reason: "evading" });
+                    sim.emit(Event::Heat {
+                        level: rec.heat.floor() as u32,
+                        reason: "evading",
+                    });
                     self.on_flee(sim, rec, spawner);
                 } else if self.timer > 8.0 && self.rng.chance(dt * 0.3) {
                     let line = self.rng.pick(&POLICE_LINES);
-                    sim.emit(Event::Speech { vehicle: lead, text: line.into(), mood: Mood::Calm });
+                    sim.emit(Event::Speech {
+                        vehicle: lead,
+                        text: line.into(),
+                        mood: Mood::Calm,
+                    });
                 }
             }
             PoliceStage::Stopped => {
@@ -293,15 +378,33 @@ impl PoliceSystem {
                     self.stage = PoliceStage::Pursuit;
                     self.pursuit_time = 0.0;
                     rec.heat = rec.heat.max(2.0);
-                    sim.emit(Event::Pullover { police: Some(lead), stage: PulloverStage::Fled });
+                    sim.emit(Event::Pullover {
+                        police: Some(lead),
+                        stage: PulloverStage::Fled,
+                    });
                     self.on_flee(sim, rec, spawner);
                 } else if self.ticket_countdown <= 0.0 {
                     let t = rec.issue_ticket();
-                    let reason = if t.count == 1 { "1 violation".to_string() } else { format!("{} violations", t.count) };
-                    sim.emit(Event::Ticket { vehicle: pid, total: t.total, points: t.points, reason });
-                    sim.emit(Event::Pullover { police: Some(lead), stage: PulloverStage::Issued });
+                    let reason = if t.count == 1 {
+                        "1 violation".to_string()
+                    } else {
+                        format!("{} violations", t.count)
+                    };
+                    sim.emit(Event::Ticket {
+                        vehicle: pid,
+                        total: t.total,
+                        points: t.points,
+                        reason,
+                    });
+                    sim.emit(Event::Pullover {
+                        police: Some(lead),
+                        stage: PulloverStage::Issued,
+                    });
                     rec.heat = 0.0;
-                    sim.emit(Event::Heat { level: 0, reason: "ticket issued" });
+                    sim.emit(Event::Heat {
+                        level: 0,
+                        reason: "ticket issued",
+                    });
                     self.release(sim);
                 }
             }
@@ -322,9 +425,14 @@ impl PoliceSystem {
                 let want = 5f64.min(2.0 + (self.pursuit_time / 45.0).floor());
                 if want > rec.heat {
                     rec.heat = want;
-                    sim.emit(Event::Heat { level: want as u32, reason: "pursuit continues" });
+                    sim.emit(Event::Heat {
+                        level: want as u32,
+                        reason: "pursuit continues",
+                    });
                 }
-                if (self.units.len() as f64) < 4f64.min(rec.heat.floor()) && self.rng.chance(dt * 0.2) {
+                if (self.units.len() as f64) < 4f64.min(rec.heat.floor())
+                    && self.rng.chance(dt * 0.2)
+                {
                     self.add_unit(sim, spawner);
                 }
                 // Arrest: stopped with an officer right there.
@@ -336,15 +444,32 @@ impl PoliceSystem {
                 if self.still_time > 4.0 {
                     let t = rec.issue_ticket();
                     rec.money -= 1000.0;
-                    sim.emit(Event::Ticket { vehicle: pid, total: t.total + 1000.0, points: t.points, reason: "arrested: fines + impound fee".into() });
-                    sim.emit(Event::Pullover { police: Some(lead), stage: PulloverStage::Issued });
+                    sim.emit(Event::Ticket {
+                        vehicle: pid,
+                        total: t.total + 1000.0,
+                        points: t.points,
+                        reason: "arrested: fines + impound fee".into(),
+                    });
+                    sim.emit(Event::Pullover {
+                        police: Some(lead),
+                        stage: PulloverStage::Issued,
+                    });
                     rec.heat = 0.0;
-                    sim.emit(Event::Heat { level: 0, reason: "arrested" });
+                    sim.emit(Event::Heat {
+                        level: 0,
+                        reason: "arrested",
+                    });
                     self.release(sim);
                 } else if self.lost_time > 22.0 {
-                    sim.emit(Event::Pullover { police: Some(lead), stage: PulloverStage::Escaped });
+                    sim.emit(Event::Pullover {
+                        police: Some(lead),
+                        stage: PulloverStage::Escaped,
+                    });
                     rec.heat = 0.0;
-                    sim.emit(Event::Heat { level: 0, reason: "escaped" });
+                    sim.emit(Event::Heat {
+                        level: 0,
+                        reason: "escaped",
+                    });
                     self.release(sim);
                 }
             }
@@ -355,7 +480,16 @@ impl PoliceSystem {
     fn on_flee(&mut self, sim: &mut Sim, rec: &mut DrivingRecord, spawner: &Spawner) {
         if let Some((pid, px, py)) = player_pos(sim) {
             let r = rec.add(ViolationKind::Evading, sim.time, Witness::Police, px, py);
-            sim.emit(Event::Violation { vehicle: pid, kind: r.kind, label: r.label, fine: r.fine, points: r.points, witnessed: Witness::Police, x: px, y: py });
+            sim.emit(Event::Violation {
+                vehicle: pid,
+                kind: r.kind,
+                label: r.label,
+                fine: r.fine,
+                points: r.points,
+                witnessed: Witness::Police,
+                x: px,
+                y: py,
+            });
         }
         for &u in &self.units {
             if let Some(d) = sim.driver_mut(u) {

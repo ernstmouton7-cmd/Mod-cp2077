@@ -245,7 +245,8 @@ impl Vehicle {
         if self.mode == MotionMode::Physics {
             return;
         }
-        self.dynamics.reset(self.x, self.y, self.heading, self.speed);
+        self.dynamics
+            .reset(self.x, self.y, self.heading, self.speed);
         self.dynamics.v = self.lat_vel;
         self.mode = MotionMode::Physics;
         self.physics_time = 0.0;

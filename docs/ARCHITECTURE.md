@@ -113,3 +113,45 @@ identical results. JS and Lua agree closely but not bit-for-bit, because V8 and
 libm round transcendental functions differently and traffic amplifies tiny
 differences. `tests/parity.test.ts` mirrors `tests/lua/smoke.lua` so the two
 builds can be compared.
+
+## Rust port (`engine/crates/traffic`)
+
+`gridlock-traffic` (lib `gridlock_traffic`) is a port of `src/core` to Rust for
+the native engine. It keeps the same algorithms, constants, units (metres,
+seconds, x east, y north, heading CCW from +x) and RNG (`math/rng.rs` is the
+same Park–Miller generator), so a seed means the same city and traffic. The
+ported test suite reproduces the TypeScript runs' printed metrics exactly
+(network counts, the 10-minute city run, the smoke scenario, pedestrians,
+incidents). It has no runtime dependencies.
+
+| TypeScript | Rust |
+|---|---|
+| `road/`, `signals/`, `vehicle/`, `physics/`, `ai/`, `law/`, `player/`, `world/` | same module names (`road`, `signals`, `vehicle`, `physics`, `ai`, `law`, `player`, `world`) |
+| object references between entities | typed indices: `NodeId`, `RoadId`, `LaneId`, `ConnectorId`, `ApproachId`, `SignalId`, `CrosswalkId`; `SegRef::{Lane, Connector}` for segments; stable `VehicleId` (never reused) |
+| occupancy arrays on each segment | `Occupancy` (one `Vec<OccEntry>` per lane and connector) next to an immutable `Network` |
+| `SimContext` (the `World` itself) | `world::Sim`: network, router, signals, vehicles, occupancy, events, RNG, environment, pedestrians, obstacles. `World` owns a `Sim` plus input, player driver, monitor, record, police and spawner, so systems borrow disjointly |
+| `drivers: Map<id, AIDriver>` | each AI `Vehicle` owns its `AIDriver`; during its update the driver is taken out of the vehicle and gets `&mut Sim` |
+| `EventBus` + `SimEvent` | `Event` enum queued in `EventQueue`; the host calls `World::drain_events()` each step |
+| `SignalController.onChange` | `SignalController::update` returns `Option<SignalChange>` |
+
+Offenses that reach a driver whose brain is running further up the call stack
+(a horn reaction chain that comes back to it) are applied when its update
+returns, not in the middle of it.
+
+**Host-physics bridge.** `Vehicle::external` marks a host-simulated body: the
+World does not integrate its dynamics or run 2D collision response for it, but
+still runs its powertrain/gear logic and its AI. Each step the host calls
+`set_external_pose(id, ExternalPose { x, y, heading, vx, vy, yaw_rate })` for
+physics-mode external vehicles (lane-mode ones keep their kinematic lane pose,
+which the host follows), reads `ai_controls(id)` (physics-mode AI) or
+`player_controls()` as `DriveControls { steer, steer_angle, throttle, brake,
+handbrake, gear_dir }`, and reports its contacts with `report_collision(a, b,
+impulse, point)` (`b = None` for static geometry). Reported collisions get the
+same consequences as internal ones: lane cars switch to physics mode, damage,
+crash reactions, anger and grudges, `Collision`/`CrashStatic` events,
+hit-and-run tracking and ambulances. `WorldOptions { external_physics: true }`
+spawns every vehicle external and disables the internal 2D collision
+detection.
+
+Performance: about 0.09 ms per step for the default city (~90 vehicles) in a
+release build (`cargo run -p gridlock-traffic --release --example bench`).

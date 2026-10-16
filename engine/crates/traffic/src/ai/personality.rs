@@ -78,14 +78,62 @@ pub const ARCHETYPES: [Archetype; 8] = [
 /// Template for an archetype.
 pub fn template(a: Archetype) -> Template {
     match a {
-        Archetype::Commuter => Template { label: "Commuter", weight: 40.0, base: [0.35, 0.55, 0.75, 0.6, 0.8, 0.4, 1.03, 1.4, 1.0, 2.2, 2.2, 0.85, 1.0, 0.35, 4.5] },
-        Archetype::Cautious => Template { label: "Cautious driver", weight: 14.0, base: [0.1, 0.85, 0.95, 0.4, 0.85, 0.8, 0.9, 2.0, 0.7, 1.8, 3.0, 0.98, 0.5, 0.1, 6.0] },
-        Archetype::Speeder => Template { label: "Hurried courier", weight: 14.0, base: [0.6, 0.35, 0.45, 0.7, 0.75, 0.15, 1.2, 0.9, 1.3, 3.0, 1.6, 0.5, 1.3, 0.6, 3.5] },
-        Archetype::Aggressor => Template { label: "Hot-head", weight: 8.0, base: [0.9, 0.12, 0.3, 0.65, 0.7, 0.0, 1.25, 0.7, 1.4, 3.5, 1.4, 0.25, 2.0, 0.95, 2.8] },
-        Archetype::Distracted => Template { label: "Distracted driver", weight: 8.0, base: [0.3, 0.6, 0.7, 0.35, 0.25, 0.4, 0.97, 1.5, 0.9, 2.2, 2.2, 0.55, 0.9, 0.2, 4.5] },
-        Archetype::Professional => Template { label: "Professional driver", weight: 8.0, base: [0.4, 0.65, 0.8, 0.9, 0.9, 0.3, 1.05, 1.2, 1.1, 2.5, 2.0, 0.9, 0.9, 0.55, 3.8] },
-        Archetype::Joyrider => Template { label: "Joyrider", weight: 5.0, base: [0.75, 0.3, 0.2, 0.55, 0.6, 0.05, 1.4, 0.8, 1.5, 3.5, 1.5, 0.2, 1.5, 0.8, 2.5] },
-        Archetype::Zen => Template { label: "Zen master", weight: 3.0, base: [0.02, 1.0, 0.9, 0.8, 0.95, 1.0, 0.98, 1.8, 0.9, 2.0, 2.5, 1.0, 0.2, 0.02, 5.0] },
+        Archetype::Commuter => Template {
+            label: "Commuter",
+            weight: 40.0,
+            base: [
+                0.35, 0.55, 0.75, 0.6, 0.8, 0.4, 1.03, 1.4, 1.0, 2.2, 2.2, 0.85, 1.0, 0.35, 4.5,
+            ],
+        },
+        Archetype::Cautious => Template {
+            label: "Cautious driver",
+            weight: 14.0,
+            base: [
+                0.1, 0.85, 0.95, 0.4, 0.85, 0.8, 0.9, 2.0, 0.7, 1.8, 3.0, 0.98, 0.5, 0.1, 6.0,
+            ],
+        },
+        Archetype::Speeder => Template {
+            label: "Hurried courier",
+            weight: 14.0,
+            base: [
+                0.6, 0.35, 0.45, 0.7, 0.75, 0.15, 1.2, 0.9, 1.3, 3.0, 1.6, 0.5, 1.3, 0.6, 3.5,
+            ],
+        },
+        Archetype::Aggressor => Template {
+            label: "Hot-head",
+            weight: 8.0,
+            base: [
+                0.9, 0.12, 0.3, 0.65, 0.7, 0.0, 1.25, 0.7, 1.4, 3.5, 1.4, 0.25, 2.0, 0.95, 2.8,
+            ],
+        },
+        Archetype::Distracted => Template {
+            label: "Distracted driver",
+            weight: 8.0,
+            base: [
+                0.3, 0.6, 0.7, 0.35, 0.25, 0.4, 0.97, 1.5, 0.9, 2.2, 2.2, 0.55, 0.9, 0.2, 4.5,
+            ],
+        },
+        Archetype::Professional => Template {
+            label: "Professional driver",
+            weight: 8.0,
+            base: [
+                0.4, 0.65, 0.8, 0.9, 0.9, 0.3, 1.05, 1.2, 1.1, 2.5, 2.0, 0.9, 0.9, 0.55, 3.8,
+            ],
+        },
+        Archetype::Joyrider => Template {
+            label: "Joyrider",
+            weight: 5.0,
+            base: [
+                0.75, 0.3, 0.2, 0.55, 0.6, 0.05, 1.4, 0.8, 1.5, 3.5, 1.5, 0.2, 1.5, 0.8, 2.5,
+            ],
+        },
+        Archetype::Zen => Template {
+            label: "Zen master",
+            weight: 3.0,
+            base: [
+                0.02, 1.0, 0.9, 0.8, 0.95, 1.0, 0.98, 1.8, 0.9, 2.0, 2.5, 1.0, 0.2, 0.02, 5.0,
+            ],
+        },
     }
 }
 
@@ -94,7 +142,10 @@ pub fn sample_personality(rng: &mut Rng, forced: Option<Archetype>) -> Personali
     let arch = match forced {
         Some(a) => a,
         None => {
-            let entries: Vec<(Archetype, f64)> = ARCHETYPES.iter().map(|&a| (a, template(a).weight)).collect();
+            let entries: Vec<(Archetype, f64)> = ARCHETYPES
+                .iter()
+                .map(|&a| (a, template(a).weight))
+                .collect();
             rng.weighted(&entries)
         }
     };

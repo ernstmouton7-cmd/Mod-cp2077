@@ -42,7 +42,9 @@ pub struct Pedestrian {
     pub shout_cooldown: f64,
 }
 
-const SHIRTS: [u32; 9] = [0xe0e0e0, 0x2b2b2b, 0xb03a2e, 0x2e86c1, 0xf1c40f, 0x7d3c98, 0x16a085, 0xd35400, 0x34495e];
+const SHIRTS: [u32; 9] = [
+    0xe0e0e0, 0x2b2b2b, 0xb03a2e, 0x2e86c1, 0xf1c40f, 0x7d3c98, 0x16a085, 0xd35400, 0x34495e,
+];
 
 impl Pedestrian {
     pub fn new(id: PedId, cw: &Crosswalk, rng: &mut Rng) -> Self {
@@ -77,7 +79,11 @@ impl Pedestrian {
     pub fn place(&mut self, cw: &Crosswalk) {
         let mut t = self.t;
         if self.state == PedState::Waiting {
-            t = if self.dir > 0.0 { -0.9 / cw.length } else { 1.0 + 0.9 / cw.length };
+            t = if self.dir > 0.0 {
+                -0.9 / cw.length
+            } else {
+                1.0 + 0.9 / cw.length
+            };
         }
         self.x = cw.ax + (cw.bx - cw.ax) * t;
         self.y = cw.ay + (cw.by - cw.ay) * t;
@@ -112,11 +118,24 @@ pub struct PedestrianSystem {
 
 impl PedestrianSystem {
     pub fn new(crosswalks: Vec<Crosswalk>, rng: Rng) -> Self {
-        PedestrianSystem { peds: Vec::new(), crosswalks, rng, next_id: 1, spawn_timer: 0.0, target: 40 }
+        PedestrianSystem {
+            peds: Vec::new(),
+            crosswalks,
+            rng,
+            next_id: 1,
+            spawn_timer: 0.0,
+            target: 40,
+        }
     }
 
     /// Is walking allowed across this crosswalk right now?
-    pub fn walk_allowed(&self, net: &Network, signals: &[SignalController], cw: CrosswalkId, reckless: bool) -> bool {
+    pub fn walk_allowed(
+        &self,
+        net: &Network,
+        signals: &[SignalController],
+        cw: CrosswalkId,
+        reckless: bool,
+    ) -> bool {
         walk_allowed_cw(net, signals, &self.crosswalks[cw.idx()], reckless)
     }
 
@@ -127,7 +146,11 @@ impl PedestrianSystem {
             if self.peds.len() < self.target {
                 let ci = self.rng.index(self.crosswalks.len());
                 let cw = &self.crosswalks[ci];
-                let crowded = self.peds.iter().filter(|p| p.cw == cw.id && p.state == PedState::Waiting).count();
+                let crowded = self
+                    .peds
+                    .iter()
+                    .filter(|p| p.cw == cw.id && p.state == PedState::Waiting)
+                    .count();
                 if crowded < 4 {
                     let id = PedId(self.next_id);
                     self.next_id += 1;
@@ -151,7 +174,13 @@ impl PedestrianSystem {
                     } else {
                         let midx = (cw.ax + cw.bx) / 2.0;
                         let midy = (cw.ay + cw.by) / 2.0;
-                        go = p.waited > 1.5 && !host.traffic_approaching(midx, midy, cw.length / 2.0 + 2.0, if p.reckless { 1.5 } else { 3.5 });
+                        go = p.waited > 1.5
+                            && !host.traffic_approaching(
+                                midx,
+                                midy,
+                                cw.length / 2.0 + 2.0,
+                                if p.reckless { 1.5 } else { 3.5 },
+                            );
                     }
                     if p.waited > 120.0 {
                         go = true;
@@ -159,7 +188,14 @@ impl PedestrianSystem {
                     if go {
                         let sx = cw.ax + (cw.bx - cw.ax) * p.t;
                         let sy = cw.ay + (cw.by - cw.ay) * p.t;
-                        if host.vehicle_at(sx, sy, 2.2) || host.traffic_approaching(sx, sy, 2.5, if p.reckless { 0.6 } else { 1.4 }) {
+                        if host.vehicle_at(sx, sy, 2.2)
+                            || host.traffic_approaching(
+                                sx,
+                                sy,
+                                2.5,
+                                if p.reckless { 0.6 } else { 1.4 },
+                            )
+                        {
                             go = false;
                         }
                     }
@@ -223,9 +259,16 @@ impl PedestrianSystem {
     }
 }
 
-fn walk_allowed_cw(net: &Network, signals: &[SignalController], cw: &Crosswalk, reckless: bool) -> bool {
+fn walk_allowed_cw(
+    net: &Network,
+    signals: &[SignalController],
+    cw: &Crosswalk,
+    reckless: bool,
+) -> bool {
     let n = net.node(cw.node);
-    let Some(sid) = n.signal.filter(|_| n.control == ControlType::Signal) else { return false };
+    let Some(sid) = n.signal.filter(|_| n.control == ControlType::Signal) else {
+        return false;
+    };
     let sig = &signals[sid.idx()];
     if sig.mode == SignalMode::Flashing || sig.mode == SignalMode::Off {
         return false;

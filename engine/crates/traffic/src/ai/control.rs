@@ -24,7 +24,12 @@ pub fn drive_toward(v: &mut Vehicle, tx: f64, ty: f64, target_speed: f64, allow_
         steer = -((2.0 * l * wrap_angle(alpha + std::f64::consts::PI).sin()) / ld).atan();
     }
     v.steer_target = clamp(steer, -v.spec.max_steer, v.spec.max_steer);
-    let sharp = if reverse { wrap_angle(alpha + std::f64::consts::PI) } else { alpha }.abs();
+    let sharp = if reverse {
+        wrap_angle(alpha + std::f64::consts::PI)
+    } else {
+        alpha
+    }
+    .abs();
     let mut want = target_speed * clamp(1.2 - sharp / 1.6, 0.25, 1.0);
     if reverse {
         want = -target_speed.min(4.0);

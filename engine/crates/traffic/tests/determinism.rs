@@ -7,7 +7,12 @@ mod common;
 use gridlock_traffic::{ActionId, World, WorldOptions};
 
 fn smoke(seed: i64) -> (u64, usize, f64) {
-    let mut world = World::new(WorldOptions { seed, traffic: 110, start_hour: 17.5, ..Default::default() });
+    let mut world = World::new(WorldOptions {
+        seed,
+        traffic: 110,
+        start_hour: 17.5,
+        ..Default::default()
+    });
     let mut events = Vec::new();
     let (x0, y0) = {
         let p = world.player().unwrap();
@@ -34,7 +39,11 @@ fn smoke(seed: i64) -> (u64, usize, f64) {
     for _ in 0..7200 {
         common::step(&mut world, &mut events);
     }
-    println!("seed {seed}: moved={moved:.1} collisions={} events: {:?}", world.stats().collisions, common::count(&events));
+    println!(
+        "seed {seed}: moved={moved:.1} collisions={} events: {:?}",
+        world.stats().collisions,
+        common::count(&events)
+    );
     (world.state_hash(), events.len(), moved)
 }
 

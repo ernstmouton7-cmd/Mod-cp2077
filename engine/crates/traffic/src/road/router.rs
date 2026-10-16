@@ -40,7 +40,10 @@ impl Router {
         for r in &net.roads {
             max_speed = max_speed.max(r.speed_limit);
         }
-        Router { congestion: HashMap::new(), max_speed }
+        Router {
+            congestion: HashMap::new(),
+            max_speed,
+        }
     }
 
     fn control_delay(net: &Network, n: NodeId) -> f64 {
@@ -54,7 +57,13 @@ impl Router {
 
     /// Route from the end of `start_lane` (its `to` node) onto `goal_road` in
     /// the given direction, or `None` if unreachable.
-    pub fn route(&self, net: &Network, start_lane: LaneId, goal_road: RoadId, goal_forward: bool) -> Option<Vec<RouteStep>> {
+    pub fn route(
+        &self,
+        net: &Network,
+        start_lane: LaneId,
+        goal_road: RoadId,
+        goal_forward: bool,
+    ) -> Option<Vec<RouteStep>> {
         let gr = net.road(goal_road);
         let goal_node_from = if goal_forward { gr.a } else { gr.b };
         let goal_to = if goal_forward { gr.b } else { gr.a };
@@ -69,7 +78,15 @@ impl Router {
         let mut arena: Vec<OpenEntry> = Vec::new();
         let mut open: Vec<usize> = Vec::new();
         let mut best: HashMap<(NodeId, Option<RoadId>), f64> = HashMap::new();
-        arena.push(OpenEntry { f: h(start), g: 0.0, node: start, via: Some(sl.road), parent: None, step_road: None, step_forward: true });
+        arena.push(OpenEntry {
+            f: h(start),
+            g: 0.0,
+            node: start,
+            via: Some(sl.road),
+            parent: None,
+            step_road: None,
+            step_forward: true,
+        });
         open.push(0);
         let mut iterations = 0;
         while !open.is_empty() && iterations < 20000 {
@@ -85,13 +102,24 @@ impl Router {
             }
             let cur_i = open.swap_remove(bi);
             let (cur_node, cur_via, cur_g) = (arena[cur_i].node, arena[cur_i].via, arena[cur_i].g);
-            if cur_node == goal_node_from && cur_via != Some(goal_road) && self.can_turn(net, cur_node, cur_via, goal_road, goal_forward) {
-                let mut steps = vec![RouteStep { road: goal_road, forward: goal_forward, to: goal_to }];
+            if cur_node == goal_node_from
+                && cur_via != Some(goal_road)
+                && self.can_turn(net, cur_node, cur_via, goal_road, goal_forward)
+            {
+                let mut steps = vec![RouteStep {
+                    road: goal_road,
+                    forward: goal_forward,
+                    to: goal_to,
+                }];
                 let mut e = Some(cur_i);
                 while let Some(ei) = e {
                     let en = &arena[ei];
                     let Some(sr) = en.step_road else { break };
-                    steps.push(RouteStep { road: sr, forward: en.step_forward, to: en.node });
+                    steps.push(RouteStep {
+                        road: sr,
+                        forward: en.step_forward,
+                        to: en.node,
+                    });
                     e = en.parent;
                 }
                 steps.reverse();
@@ -122,7 +150,15 @@ impl Router {
                     }
                 }
                 best.insert(k, g);
-                arena.push(OpenEntry { f: g + h(next), g, node: next, via: Some(r), parent: Some(cur_i), step_road: Some(r), step_forward: fwd });
+                arena.push(OpenEntry {
+                    f: g + h(next),
+                    g,
+                    node: next,
+                    via: Some(r),
+                    parent: Some(cur_i),
+                    step_road: Some(r),
+                    step_forward: fwd,
+                });
                 open.push(arena.len() - 1);
             }
         }
@@ -131,7 +167,14 @@ impl Router {
 
     /// Is there any lane connection from road `from` into road `to` (in the
     /// given direction) at node `n`?
-    pub fn can_turn(&self, net: &Network, n: NodeId, from: Option<RoadId>, to: RoadId, forward: bool) -> bool {
+    pub fn can_turn(
+        &self,
+        net: &Network,
+        n: NodeId,
+        from: Option<RoadId>,
+        to: RoadId,
+        forward: bool,
+    ) -> bool {
         let tr = net.road(to);
         let out_lanes = if forward { &tr.lanes_ab } else { &tr.lanes_ba };
         if out_lanes.is_empty() {

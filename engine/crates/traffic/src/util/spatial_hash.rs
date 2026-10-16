@@ -13,7 +13,11 @@ pub struct SpatialHash<T> {
 
 impl<T: Copy + PartialEq> SpatialHash<T> {
     pub fn new(cell_size: f64) -> Self {
-        SpatialHash { cells: HashMap::new(), inv: 1.0 / cell_size, cell_size }
+        SpatialHash {
+            cells: HashMap::new(),
+            inv: 1.0 / cell_size,
+            cell_size,
+        }
     }
 
     #[inline]

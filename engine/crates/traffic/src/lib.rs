@@ -32,20 +32,37 @@ pub mod vehicle;
 pub mod world;
 
 pub use ai::{
-    idm_accel, idm_free, line_for, offense_anger, sample_personality, AIDriver, Archetype, DriverState, Emotion, HoldKind, IdmParams, Mood, OffenseKind, PedState, Pedestrian, PedestrianSystem,
-    Personality, RageBehavior, ARCHETYPES,
+    idm_accel, idm_free, line_for, offense_anger, sample_personality, AIDriver, Archetype,
+    DriverState, Emotion, HoldKind, IdmParams, Mood, OffenseKind, PedState, Pedestrian,
+    PedestrianSystem, Personality, RageBehavior, ARCHETYPES,
 };
-pub use ids::{ApproachId, ConnectorId, CrosswalkId, LaneId, NodeId, PedId, RoadId, SegRef, SignalId, VehicleId};
-pub use law::{DrivingRecord, Observation, PlayerMonitor, PoliceStage, PoliceSystem, ViolationDef, ViolationKind, ViolationRecord, Witness};
+pub use ids::{
+    ApproachId, ConnectorId, CrosswalkId, LaneId, NodeId, PedId, RoadId, SegRef, SignalId,
+    VehicleId,
+};
+pub use law::{
+    DrivingRecord, Observation, PlayerMonitor, PoliceStage, PoliceSystem, ViolationDef,
+    ViolationKind, ViolationRecord, Witness,
+};
 pub use math::{Path, Rng, Vec2};
-pub use player::{action_def, ActionDef, ActionId, ControlFrame, InputMapper, PlayerDriver, ACTIONS};
+pub use player::{
+    action_def, ActionDef, ActionId, ControlFrame, InputMapper, PlayerDriver, ACTIONS,
+};
 pub use road::{
-    build_city, Approach, ApproachSign, Building, City, CityOptions, ConflictKind, ConflictZone, Connector, ControlType, Crosswalk, Lane, Network, Node, Road, RoadKind, RoadOptions, Router,
+    build_city, Approach, ApproachSign, Building, City, CityOptions, ConflictKind, ConflictZone,
+    Connector, ControlType, Crosswalk, Lane, Network, Node, Road, RoadKind, RoadOptions, Router,
     TurnType,
 };
-pub use signals::{HeadState, Indication, Lamp, PedLamp, PhaseState, SignalController, SignalMode, SignalOptions};
-pub use vehicle::{max_accel_at, spec, top_speed, MotionMode, Powertrain, Vehicle, VehicleClass, VehicleDynamics, VehicleLights, VehicleRole, VehicleSpec, CIVILIAN_CLASSES, SPECS};
-pub use world::{DriveControls, Environment, Event, ExternalPose, Sim, Weather, World, WorldOptions, WorldStats};
+pub use signals::{
+    HeadState, Indication, Lamp, PedLamp, PhaseState, SignalController, SignalMode, SignalOptions,
+};
+pub use vehicle::{
+    max_accel_at, spec, top_speed, MotionMode, Powertrain, Vehicle, VehicleClass, VehicleDynamics,
+    VehicleLights, VehicleRole, VehicleSpec, CIVILIAN_CLASSES, SPECS,
+};
+pub use world::{
+    DriveControls, Environment, Event, ExternalPose, Sim, Weather, World, WorldOptions, WorldStats,
+};
 
 /// Crate version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

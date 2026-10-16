@@ -65,12 +65,24 @@ pub fn box_contact(a: &BoxShape, b: &BoxShape) -> Option<Contact> {
     }
     let pa = support(a, bnx, bny);
     let pb = support(b, -bnx, -bny);
-    Some(Contact { nx: bnx, ny: bny, depth: best, px: (pa.0 + pb.0) / 2.0, py: (pa.1 + pb.1) / 2.0 })
+    Some(Contact {
+        nx: bnx,
+        ny: bny,
+        depth: best,
+        px: (pa.0 + pb.0) / 2.0,
+        py: (pa.1 + pb.1) / 2.0,
+    })
 }
 
 /// Impulse response between two rigid bodies; separates them along the
 /// normal and returns the normal impulse (N·s).
-pub fn resolve_bodies(a: &mut VehicleDynamics, b: &mut VehicleDynamics, c: &Contact, restitution: f64, friction: f64) -> f64 {
+pub fn resolve_bodies(
+    a: &mut VehicleDynamics,
+    b: &mut VehicleDynamics,
+    c: &Contact,
+    restitution: f64,
+    friction: f64,
+) -> f64 {
     let rax = c.px - a.x;
     let ray = c.py - a.y;
     let rbx = c.px - b.x;
@@ -113,7 +125,12 @@ pub fn resolve_bodies(a: &mut VehicleDynamics, b: &mut VehicleDynamics, c: &Cont
 
 /// Impulse response against an immovable obstacle (normal points from the
 /// body into the obstacle). Returns the normal impulse.
-pub fn resolve_static(a: &mut VehicleDynamics, c: &Contact, restitution: f64, friction: f64) -> f64 {
+pub fn resolve_static(
+    a: &mut VehicleDynamics,
+    c: &Contact,
+    restitution: f64,
+    friction: f64,
+) -> f64 {
     let rax = c.px - a.x;
     let ray = c.py - a.y;
     a.x -= c.nx * (c.depth - 0.005).max(0.0);

@@ -7,7 +7,11 @@ use std::time::Instant;
 
 fn main() {
     let t0 = Instant::now();
-    let mut world = World::new(WorldOptions { seed: 42, start_hour: 17.5, ..Default::default() });
+    let mut world = World::new(WorldOptions {
+        seed: 42,
+        start_hour: 17.5,
+        ..Default::default()
+    });
     let build_ms = t0.elapsed().as_secs_f64() * 1000.0;
     let steps = 180 * 60;
     let t1 = Instant::now();

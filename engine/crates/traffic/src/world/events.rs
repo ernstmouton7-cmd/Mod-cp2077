@@ -50,36 +50,155 @@ pub enum IncidentKind {
 /// Renderers, audio and mod adapters consume them via `World::drain_events`.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
-    Horn { vehicle: VehicleId, long: bool },
-    Flash { vehicle: VehicleId },
-    Speech { vehicle: VehicleId, text: String, mood: Mood },
-    Offense { offender: VehicleId, victim: VehicleId, kind: OffenseKind, anger: f64 },
-    Mood { vehicle: VehicleId, mood: Mood, target: Option<VehicleId> },
-    RageStart { vehicle: VehicleId, target: VehicleId, behavior: RageBehavior },
-    RageEnd { vehicle: VehicleId, reason: &'static str },
-    Collision { a: VehicleId, b: VehicleId, impulse: f64, severity: f64, x: f64, y: f64, at_fault: VehicleId },
-    CrashStatic { vehicle: VehicleId, severity: f64, x: f64, y: f64 },
-    NearMiss { a: VehicleId, b: VehicleId },
-    Signal { node: NodeId, phase: String, state: PhaseState },
-    Violation { vehicle: VehicleId, kind: ViolationKind, label: &'static str, fine: f64, points: u32, witnessed: Witness, x: f64, y: f64 },
-    Ticket { vehicle: VehicleId, total: f64, points: u32, reason: String },
-    CameraFlash { x: f64, y: f64, kind: CameraKind },
-    Heat { level: u32, reason: &'static str },
-    Pullover { police: Option<VehicleId>, stage: PulloverStage },
-    Dispatch { unit: VehicleId, kind: DispatchKind, x: f64, y: f64, reason: &'static str },
-    Apology { from: VehicleId, to: VehicleId, calmed: f64 },
-    Gesture { from: VehicleId, kind: GestureKind },
-    Stall { vehicle: VehicleId },
-    Engine { vehicle: VehicleId, on: bool },
-    Shift { vehicle: VehicleId, gear: String },
-    Grind { vehicle: VehicleId },
-    Chime { vehicle: VehicleId, reason: &'static str },
-    Spawn { vehicle: VehicleId },
-    Despawn { vehicle: VehicleId },
-    PedSpeech { ped: PedId, text: &'static str, x: f64, y: f64 },
-    PedHit { ped: PedId, vehicle: VehicleId, severity: f64, x: f64, y: f64 },
-    Incident { kind: IncidentKind, x: f64, y: f64, vehicle: Option<VehicleId>, node: Option<NodeId>, place: String },
-    Info { text: String },
+    Horn {
+        vehicle: VehicleId,
+        long: bool,
+    },
+    Flash {
+        vehicle: VehicleId,
+    },
+    Speech {
+        vehicle: VehicleId,
+        text: String,
+        mood: Mood,
+    },
+    Offense {
+        offender: VehicleId,
+        victim: VehicleId,
+        kind: OffenseKind,
+        anger: f64,
+    },
+    Mood {
+        vehicle: VehicleId,
+        mood: Mood,
+        target: Option<VehicleId>,
+    },
+    RageStart {
+        vehicle: VehicleId,
+        target: VehicleId,
+        behavior: RageBehavior,
+    },
+    RageEnd {
+        vehicle: VehicleId,
+        reason: &'static str,
+    },
+    Collision {
+        a: VehicleId,
+        b: VehicleId,
+        impulse: f64,
+        severity: f64,
+        x: f64,
+        y: f64,
+        at_fault: VehicleId,
+    },
+    CrashStatic {
+        vehicle: VehicleId,
+        severity: f64,
+        x: f64,
+        y: f64,
+    },
+    NearMiss {
+        a: VehicleId,
+        b: VehicleId,
+    },
+    Signal {
+        node: NodeId,
+        phase: String,
+        state: PhaseState,
+    },
+    Violation {
+        vehicle: VehicleId,
+        kind: ViolationKind,
+        label: &'static str,
+        fine: f64,
+        points: u32,
+        witnessed: Witness,
+        x: f64,
+        y: f64,
+    },
+    Ticket {
+        vehicle: VehicleId,
+        total: f64,
+        points: u32,
+        reason: String,
+    },
+    CameraFlash {
+        x: f64,
+        y: f64,
+        kind: CameraKind,
+    },
+    Heat {
+        level: u32,
+        reason: &'static str,
+    },
+    Pullover {
+        police: Option<VehicleId>,
+        stage: PulloverStage,
+    },
+    Dispatch {
+        unit: VehicleId,
+        kind: DispatchKind,
+        x: f64,
+        y: f64,
+        reason: &'static str,
+    },
+    Apology {
+        from: VehicleId,
+        to: VehicleId,
+        calmed: f64,
+    },
+    Gesture {
+        from: VehicleId,
+        kind: GestureKind,
+    },
+    Stall {
+        vehicle: VehicleId,
+    },
+    Engine {
+        vehicle: VehicleId,
+        on: bool,
+    },
+    Shift {
+        vehicle: VehicleId,
+        gear: String,
+    },
+    Grind {
+        vehicle: VehicleId,
+    },
+    Chime {
+        vehicle: VehicleId,
+        reason: &'static str,
+    },
+    Spawn {
+        vehicle: VehicleId,
+    },
+    Despawn {
+        vehicle: VehicleId,
+    },
+    PedSpeech {
+        ped: PedId,
+        text: &'static str,
+        x: f64,
+        y: f64,
+    },
+    PedHit {
+        ped: PedId,
+        vehicle: VehicleId,
+        severity: f64,
+        x: f64,
+        y: f64,
+    },
+    Incident {
+        kind: IncidentKind,
+        x: f64,
+        y: f64,
+        vehicle: Option<VehicleId>,
+        node: Option<NodeId>,
+        place: String,
+    },
+    Info {
+        text: String,
+    },
 }
 
 impl Event {
@@ -152,7 +271,14 @@ pub struct EventQueue {
 
 impl Default for EventQueue {
     fn default() -> Self {
-        EventQueue { queue: Vec::new(), limit: 512, emitted: 0, player: None, player_stats: PlayerStats::default(), angered: HashSet::new() }
+        EventQueue {
+            queue: Vec::new(),
+            limit: 512,
+            emitted: 0,
+            player: None,
+            player_stats: PlayerStats::default(),
+            angered: HashSet::new(),
+        }
     }
 }
 
@@ -179,9 +305,16 @@ impl EventQueue {
         let Some(p) = self.player else { return };
         let st = &mut self.player_stats;
         match *e {
-            Event::Collision { a, b, severity, .. } if (a == p || b == p) && severity > 0.8 => st.collisions += 1,
+            Event::Collision { a, b, severity, .. } if (a == p || b == p) && severity > 0.8 => {
+                st.collisions += 1
+            }
             Event::NearMiss { a, .. } if a == p => st.near_misses += 1,
-            Event::Offense { offender, victim, anger, .. } if offender == p && anger > 22.0 && !self.angered.contains(&victim) => {
+            Event::Offense {
+                offender,
+                victim,
+                anger,
+                ..
+            } if offender == p && anger > 22.0 && !self.angered.contains(&victim) => {
                 self.angered.insert(victim);
                 st.angered += 1;
             }
@@ -189,7 +322,10 @@ impl EventQueue {
             Event::RageStart { target, .. } if target == p => st.rage_episodes += 1,
             Event::Horn { vehicle, long } if vehicle == p && !long => st.honks += 1,
             Event::PedHit { vehicle, .. } if vehicle == p => st.pedestrians_hit += 1,
-            Event::Violation { kind: ViolationKind::RedLight, .. } => st.red_lights_run += 1,
+            Event::Violation {
+                kind: ViolationKind::RedLight,
+                ..
+            } => st.red_lights_run += 1,
             _ => {}
         }
     }

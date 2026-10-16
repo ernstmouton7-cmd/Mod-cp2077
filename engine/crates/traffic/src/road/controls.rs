@@ -48,11 +48,19 @@ pub fn assign_node(net: &mut Network, nid: NodeId) {
                 a.major = false;
             }
             ControlType::TwowayStop => {
-                a.sign = if is_major { ApproachSign::None } else { ApproachSign::Stop };
+                a.sign = if is_major {
+                    ApproachSign::None
+                } else {
+                    ApproachSign::Stop
+                };
                 a.major = is_major;
             }
             ControlType::Yield => {
-                a.sign = if is_major { ApproachSign::None } else { ApproachSign::Yield };
+                a.sign = if is_major {
+                    ApproachSign::None
+                } else {
+                    ApproachSign::Yield
+                };
                 a.major = is_major;
             }
             ControlType::None => {
@@ -63,7 +71,10 @@ pub fn assign_node(net: &mut Network, nid: NodeId) {
     }
     // A two-way stop where every road ties for rank degenerates: make it all-way.
     if control == ControlType::TwowayStop || control == ControlType::Yield {
-        let minors = aps.iter().filter(|a| !net.approaches[a.idx()].major).count();
+        let minors = aps
+            .iter()
+            .filter(|a| !net.approaches[a.idx()].major)
+            .count();
         if minors == 0 && aps.len() >= 3 {
             net.nodes[nid.idx()].control = ControlType::AllwayStop;
             for &ap in &aps {

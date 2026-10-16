@@ -2,10 +2,19 @@
 
 mod common;
 
-use gridlock_traffic::{idm_accel, idm_free, sample_personality, Archetype, Emotion, Event, IdmParams, Indication, Mood, OffenseKind, PhaseState, Rng, SegRef, TurnType, VehicleId, World, WorldOptions};
+use gridlock_traffic::{
+    idm_accel, idm_free, sample_personality, Archetype, Emotion, Event, IdmParams, Indication,
+    Mood, OffenseKind, PhaseState, Rng, SegRef, TurnType, VehicleId, World, WorldOptions,
+};
 use std::collections::{HashMap, HashSet};
 
-const P: IdmParams = IdmParams { v0: 14.0, t: 1.4, a: 1.5, b: 2.0, s0: 2.0 };
+const P: IdmParams = IdmParams {
+    v0: 14.0,
+    t: 1.4,
+    a: 1.5,
+    b: 2.0,
+    s0: 2.0,
+};
 
 #[test]
 fn idm_reaches_desired_speed_and_stops_behind_an_obstacle_without_overlap() {
@@ -24,7 +33,10 @@ fn idm_reaches_desired_speed_and_stops_behind_an_obstacle_without_overlap() {
         x += v / 60.0;
         min_gap = min_gap.min(wall - x);
     }
-    assert!(min_gap > 1.2 && min_gap < 3.0, "standstill gap {min_gap:.2} m");
+    assert!(
+        min_gap > 1.2 && min_gap < 3.0,
+        "standstill gap {min_gap:.2} m"
+    );
 }
 
 #[test]
@@ -41,7 +53,12 @@ fn emotions_escalate_decay_and_apologies_help() {
             e.update(0.1, 2.0 + i as f64 * 0.1, 0.0);
         }
     }
-    assert!(hot.anger > zen.anger * 3.0, "hot-head {:.0} vs zen {:.0}", hot.anger, zen.anger);
+    assert!(
+        hot.anger > zen.anger * 3.0,
+        "hot-head {:.0} vs zen {:.0}",
+        hot.anger,
+        zen.anger
+    );
     assert_eq!(hot.mood, Mood::Furious);
     assert_eq!(hot.target, Some(o));
     assert!(hot.can_rage());
@@ -66,7 +83,13 @@ struct Stats {
 }
 
 fn city_run(seconds: usize, seed: i64) -> (World, Stats) {
-    let mut world = World::new(WorldOptions { seed, traffic: 110, no_player: true, start_hour: 17.0, ..Default::default() });
+    let mut world = World::new(WorldOptions {
+        seed,
+        traffic: 110,
+        no_player: true,
+        start_hour: 17.0,
+        ..Default::default()
+    });
     world.env_mut().time_scale = 0.0;
     let mut prev_seg: HashMap<VehicleId, Option<SegRef>> = HashMap::new();
     let mut stopped_for: HashMap<VehicleId, f64> = HashMap::new();
@@ -74,7 +97,11 @@ fn city_run(seconds: usize, seed: i64) -> (World, Stats) {
     let mut st = Stats::default();
     for _ in 0..seconds * 60 {
         world.step(common::DT);
-        st.collisions += world.drain_events().iter().filter(|e| matches!(e, Event::Collision { .. })).count();
+        st.collisions += world
+            .drain_events()
+            .iter()
+            .filter(|e| matches!(e, Event::Collision { .. }))
+            .count();
         let net = world.net();
         for v in world.vehicles() {
             let Some(d) = v.driver() else { continue };
@@ -89,14 +116,21 @@ fn city_run(seconds: usize, seed: i64) -> (World, Stats) {
                     if node.control == gridlock_traffic::ControlType::Signal {
                         st.entries += 1;
                         let sig = &world.signals()[node.signal.unwrap().idx()];
-                        if sig.indication(conn) == Indication::Red && sig.phase_state() != PhaseState::AllRed && conn.turn != TurnType::Right {
+                        if sig.indication(conn) == Indication::Red
+                            && sig.phase_state() != PhaseState::AllRed
+                            && conn.turn != TurnType::Right
+                        {
                             st.red_entries += 1;
                         }
                     }
                 }
             }
             prev_seg.insert(v.id, v.seg);
-            let s = if v.abs_speed() < 0.2 { stopped_for.get(&v.id).copied().unwrap_or(0.0) + common::DT } else { 0.0 };
+            let s = if v.abs_speed() < 0.2 {
+                stopped_for.get(&v.id).copied().unwrap_or(0.0) + common::DT
+            } else {
+                0.0
+            };
             stopped_for.insert(v.id, s);
             if s > st.max_stopped {
                 st.max_stopped = s;
@@ -125,8 +159,18 @@ fn ten_minutes_of_city_traffic_lights_obeyed_no_gridlock_few_crashes() {
         odo / n
     );
     assert!(st.entries > 500, "lots of junction traffic");
-    assert!((st.red_entries as f64) / (st.entries as f64) < 0.03, "fewer than 3% enter on red");
-    assert!(st.max_stopped < 200.0, "longest standstill {:.0} s (gridlock?)", st.max_stopped);
-    assert!((st.collisions as f64) / veh_hours < 3.0, "crash rate stays low");
+    assert!(
+        (st.red_entries as f64) / (st.entries as f64) < 0.03,
+        "fewer than 3% enter on red"
+    );
+    assert!(
+        st.max_stopped < 200.0,
+        "longest standstill {:.0} s (gridlock?)",
+        st.max_stopped
+    );
+    assert!(
+        (st.collisions as f64) / veh_hours < 3.0,
+        "crash rate stays low"
+    );
     assert!(st.lc_vehicles > 20, "drivers change lanes");
 }

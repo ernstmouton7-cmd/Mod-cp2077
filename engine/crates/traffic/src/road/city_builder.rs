@@ -73,7 +73,20 @@ struct LineSpec {
 }
 
 const STREET_NAMES: [&str; 14] = [
-    "Kestrel", "Ashgrove", "Ozone", "Delamain", "Ironside", "Halcyon", "Corvid", "Lumen", "Tidewater", "Saffron", "Quartz", "Juniper", "Mercury", "Bellwether",
+    "Kestrel",
+    "Ashgrove",
+    "Ozone",
+    "Delamain",
+    "Ironside",
+    "Halcyon",
+    "Corvid",
+    "Lumen",
+    "Tidewater",
+    "Saffron",
+    "Quartz",
+    "Juniper",
+    "Mercury",
+    "Bellwether",
 ];
 const AVENUE_NAMES: [&str; 4] = ["Meridian Ave", "Vanta Ave", "Arcadia Ave", "Helix Ave"];
 
@@ -85,10 +98,28 @@ fn line_specs(count: usize, rng: &mut Rng, col: bool) -> Vec<LineSpec> {
     for i in 0..count {
         let mut s;
         if i == 0 || i == count - 1 {
-            s = LineSpec { kind: RoadKind::Ring, inc: 2, dec: 2, speed: 70.0, name: "Perimeter Blvd".into(), width: 0.0 };
+            s = LineSpec {
+                kind: RoadKind::Ring,
+                inc: 2,
+                dec: 2,
+                speed: 70.0,
+                name: "Perimeter Blvd".into(),
+                width: 0.0,
+            };
         } else if i == count / 2 || (count > 8 && i == 2) {
-            s = LineSpec { kind: RoadKind::Avenue, inc: 3, dec: 3, speed: 60.0, name: AVENUE_NAMES[avenue_idx].into(), width: 0.0 };
-            avenue_idx = if avenue_idx + 1 < AVENUE_NAMES.len() { avenue_idx + 1 } else { 0 };
+            s = LineSpec {
+                kind: RoadKind::Avenue,
+                inc: 3,
+                dec: 3,
+                speed: 60.0,
+                name: AVENUE_NAMES[avenue_idx].into(),
+                width: 0.0,
+            };
+            avenue_idx = if avenue_idx + 1 < AVENUE_NAMES.len() {
+                avenue_idx + 1
+            } else {
+                0
+            };
         } else if rng.chance(0.35) {
             one_way_toggle = !one_way_toggle;
             let lanes = if rng.chance(0.5) { 2 } else { 3 };
@@ -100,7 +131,11 @@ fn line_specs(count: usize, rng: &mut Rng, col: bool) -> Vec<LineSpec> {
                 name: format!("{} St", STREET_NAMES[street_idx]),
                 width: 0.0,
             };
-            street_idx = if street_idx + 1 < STREET_NAMES.len() { street_idx + 1 } else { 0 };
+            street_idx = if street_idx + 1 < STREET_NAMES.len() {
+                street_idx + 1
+            } else {
+                0
+            };
         } else {
             let lanes = if rng.chance(0.3) { 2 } else { 1 };
             s = LineSpec {
@@ -111,7 +146,11 @@ fn line_specs(count: usize, rng: &mut Rng, col: bool) -> Vec<LineSpec> {
                 name: format!("{} St", STREET_NAMES[street_idx]),
                 width: 0.0,
             };
-            street_idx = if street_idx + 1 < STREET_NAMES.len() { street_idx + 1 } else { 0 };
+            street_idx = if street_idx + 1 < STREET_NAMES.len() {
+                street_idx + 1
+            } else {
+                0
+            };
         }
         let median = median_for(&s);
         s.width = (s.inc + s.dec) as f64 * 3.5 + median;
@@ -147,13 +186,25 @@ fn choose_control(a: &LineSpec, b: &LineSpec, rng: &mut Rng, roads: usize) -> Co
         return ControlType::Signal;
     }
     if a.kind == RoadKind::Ring || b.kind == RoadKind::Ring {
-        return if rng.chance(0.4) { ControlType::Signal } else { ControlType::TwowayStop };
+        return if rng.chance(0.4) {
+            ControlType::Signal
+        } else {
+            ControlType::TwowayStop
+        };
     }
     if a.kind == RoadKind::Oneway && b.kind == RoadKind::Oneway {
-        return if rng.chance(0.6) { ControlType::Signal } else { ControlType::AllwayStop };
+        return if rng.chance(0.6) {
+            ControlType::Signal
+        } else {
+            ControlType::AllwayStop
+        };
     }
     if a.kind == RoadKind::Oneway || b.kind == RoadKind::Oneway {
-        return if rng.chance(0.5) { ControlType::TwowayStop } else { ControlType::Signal };
+        return if rng.chance(0.5) {
+            ControlType::TwowayStop
+        } else {
+            ControlType::Signal
+        };
     }
     if rng.chance(0.65) {
         ControlType::AllwayStop
@@ -253,9 +304,16 @@ pub fn build_city(opts: CityOptions) -> City {
 
     let mut speed_cameras = Vec::new();
     for r in net.roads.iter_mut() {
-        if (r.kind == RoadKind::Avenue || r.kind == RoadKind::Ring) && rng.chance(0.15) && r.center_path.length > 60.0 {
+        if (r.kind == RoadKind::Avenue || r.kind == RoadKind::Ring)
+            && rng.chance(0.15)
+            && r.center_path.length > 60.0
+        {
             r.speed_camera = true;
-            speed_cameras.push(SpeedCamera { road: r.id, s: r.center_path.length / 2.0, forward: rng.chance(0.5) });
+            speed_cameras.push(SpeedCamera {
+                road: r.id,
+                s: r.center_path.length / 2.0,
+                forward: rng.chance(0.5),
+            });
         }
     }
 
@@ -275,9 +333,21 @@ pub fn build_city(opts: CityOptions) -> City {
             let my = (y0 + y1) / 2.0;
             let centrality = 1.0 - (mx * mx + my * my).sqrt() / max_d;
             if rng.chance(0.08) {
-                let kind = if rng.chance(0.5) { BuildingKind::Park } else { BuildingKind::Plaza };
+                let kind = if rng.chance(0.5) {
+                    BuildingKind::Park
+                } else {
+                    BuildingKind::Plaza
+                };
                 let hue = rng.next_f64();
-                buildings.push(Building { x: mx, y: my, w: x1 - x0, h: y1 - y0, height: 0.0, kind, hue });
+                buildings.push(Building {
+                    x: mx,
+                    y: my,
+                    w: x1 - x0,
+                    h: y1 - y0,
+                    height: 0.0,
+                    kind,
+                    hue,
+                });
                 continue;
             }
             let nx = if x1 - x0 > 70.0 { 2 } else { 1 };
@@ -290,7 +360,11 @@ pub fn build_city(opts: CityOptions) -> City {
                     let bx = x0 + a as f64 * (cw + gap) + cw / 2.0;
                     let by = y0 + b as f64 * (ch + gap) + ch / 2.0;
                     let tall = rng.chance(0.25 + centrality * 0.5);
-                    let height = if tall { rng.range(45.0, 90.0) + centrality * 120.0 } else { rng.range(10.0, 30.0) };
+                    let height = if tall {
+                        rng.range(45.0, 90.0) + centrality * 120.0
+                    } else {
+                        rng.range(10.0, 30.0)
+                    };
                     let w = cw * rng.range(0.82, 1.0);
                     let h = ch * rng.range(0.82, 1.0);
                     let kind = if tall {
@@ -301,10 +375,25 @@ pub fn build_city(opts: CityOptions) -> City {
                         BuildingKind::Block
                     };
                     let hue = rng.next_f64();
-                    buildings.push(Building { x: bx, y: by, w, h, height, kind, hue });
+                    buildings.push(Building {
+                        x: bx,
+                        y: by,
+                        w,
+                        h,
+                        height,
+                        kind,
+                        hue,
+                    });
                 }
             }
         }
     }
-    City { network: net, buildings, speed_cameras, xs, ys, name: "Gridlock City".into() }
+    City {
+        network: net,
+        buildings,
+        speed_cameras,
+        xs,
+        ys,
+        name: "Gridlock City".into(),
+    }
 }

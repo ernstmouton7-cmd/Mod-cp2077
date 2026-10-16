@@ -4,7 +4,9 @@ use super::sim::Sim;
 use crate::ai::driver::AIDriver;
 use crate::ai::personality::{sample_personality, Archetype};
 use crate::ids::{LaneId, SegRef, VehicleId};
-use crate::vehicle::{spec, HeadlightSwitch, MotionMode, Vehicle, VehicleClass, VehicleRole, CIVILIAN_CLASSES};
+use crate::vehicle::{
+    spec, HeadlightSwitch, MotionMode, Vehicle, VehicleClass, VehicleRole, CIVILIAN_CLASSES,
+};
 
 /// Population targets.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -31,18 +33,35 @@ pub struct Spawner {
 
 impl Spawner {
     pub fn new(opts: PopulationOptions) -> Self {
-        Spawner { timer: 0.0, enabled: true, opts, external: false }
+        Spawner {
+            timer: 0.0,
+            enabled: true,
+            opts,
+            external: false,
+        }
     }
 
     /// Weighted civilian vehicle class.
     pub fn pick_class(&self, sim: &mut Sim) -> VehicleClass {
-        let entries: Vec<(VehicleClass, f64)> = CIVILIAN_CLASSES.iter().map(|&c| (c, spec(c).spawn_weight)).collect();
+        let entries: Vec<(VehicleClass, f64)> = CIVILIAN_CLASSES
+            .iter()
+            .map(|&c| (c, spec(c).spawn_weight))
+            .collect();
         sim.rng.weighted(&entries)
     }
 
     /// Create a vehicle with a driver on `lane` at arc length `s`.
     #[allow(clippy::too_many_arguments)]
-    pub fn create(&self, sim: &mut Sim, cls: VehicleClass, role: VehicleRole, lane: LaneId, s: f64, speed: f64, archetype: Option<Archetype>) -> VehicleId {
+    pub fn create(
+        &self,
+        sim: &mut Sim,
+        cls: VehicleClass,
+        role: VehicleRole,
+        lane: LaneId,
+        s: f64,
+        speed: f64,
+        archetype: Option<Archetype>,
+    ) -> VehicleId {
         let sp = spec(cls);
         let color = sim.rng.pick(sp.colors);
         let id = sim.next_vehicle_id();
@@ -50,10 +69,18 @@ impl Spawner {
         v.external = self.external;
         let mut arch = archetype;
         if arch.is_none() {
-            if role == VehicleRole::Police || role == VehicleRole::Ambulance || cls == VehicleClass::Bus || cls == VehicleClass::Truck {
+            if role == VehicleRole::Police
+                || role == VehicleRole::Ambulance
+                || cls == VehicleClass::Bus
+                || cls == VehicleClass::Truck
+            {
                 arch = Some(Archetype::Professional);
             } else if cls == VehicleClass::Taxi {
-                arch = Some(if sim.rng.chance(0.5) { Archetype::Professional } else { Archetype::Speeder });
+                arch = Some(if sim.rng.chance(0.5) {
+                    Archetype::Professional
+                } else {
+                    Archetype::Speeder
+                });
             } else if cls == VehicleClass::Sports && sim.rng.chance(0.4) {
                 arch = Some(Archetype::Joyrider);
             }
@@ -67,14 +94,20 @@ impl Spawner {
         let seed = (sim.rng.next_f64() * 1e9).floor() as i64 + 1;
         let d = AIDriver::new(id, p, seed);
         v.place_on_segment(&sim.net, SegRef::Lane(lane), s, speed);
-        v.lights.headlight_switch = if sim.rng.chance(0.95) { HeadlightSwitch::Auto } else { HeadlightSwitch::Off };
+        v.lights.headlight_switch = if sim.rng.chance(0.95) {
+            HeadlightSwitch::Auto
+        } else {
+            HeadlightSwitch::Off
+        };
         sim.add_vehicle(v, d);
         id
     }
 
     /// A free spawn point at least `min_d` (at most `max_d`) from the player.
     pub fn find_spot(&self, sim: &mut Sim, min_d: f64, max_d: f64) -> Option<(LaneId, f64)> {
-        let pp = sim.player_idx().map(|i| (sim.vehicles[i].x, sim.vehicles[i].y));
+        let pp = sim
+            .player_idx()
+            .map(|i| (sim.vehicles[i].x, sim.vehicles[i].y));
         for _ in 0..25 {
             let li = sim.rng.index(sim.net.lanes.len());
             let lane = &sim.net.lanes[li];
@@ -102,14 +135,24 @@ impl Spawner {
     pub fn populate(&self, sim: &mut Sim, density: f64) {
         let n = (self.opts.civilians as f64 * density).floor() as usize;
         for _ in 0..n {
-            let Some((lane, s)) = self.find_spot(sim, 25.0, f64::INFINITY) else { continue };
+            let Some((lane, s)) = self.find_spot(sim, 25.0, f64::INFINITY) else {
+                continue;
+            };
             let cls = self.pick_class(sim);
             let speed = sim.net.lane(lane).speed_limit * 0.6;
             self.create(sim, cls, VehicleRole::Civilian, lane, s, speed, None);
         }
         for _ in 0..self.opts.police {
             if let Some((lane, s)) = self.find_spot(sim, 60.0, f64::INFINITY) {
-                self.create(sim, VehicleClass::Police, VehicleRole::Police, lane, s, 5.0, None);
+                self.create(
+                    sim,
+                    VehicleClass::Police,
+                    VehicleRole::Police,
+                    lane,
+                    s,
+                    5.0,
+                    None,
+                );
             }
         }
     }
@@ -125,7 +168,9 @@ impl Spawner {
             return;
         }
         self.timer = 0.5;
-        let pp = sim.player_idx().map(|i| (sim.vehicles[i].x, sim.vehicles[i].y));
+        let pp = sim
+            .player_idx()
+            .map(|i| (sim.vehicles[i].x, sim.vehicles[i].y));
         let mut civ = 0;
         let mut police = 0;
         for v in &sim.vehicles {
@@ -143,7 +188,8 @@ impl Spawner {
             if v.is_player || busy.contains(&v.id) {
                 continue;
             }
-            let far = pp.is_none_or(|(px, py)| (v.x - px) * (v.x - px) + (v.y - py) * (v.y - py) > md * md);
+            let far = pp
+                .is_none_or(|(px, py)| (v.x - px) * (v.x - px) + (v.y - py) * (v.y - py) > md * md);
             if v.wrecked {
                 v.despawn_timer += 0.5;
             }
@@ -164,7 +210,9 @@ impl Spawner {
                 .vehicles
                 .iter()
                 .find(|v| {
-                    let near = pp.is_some_and(|(px, py)| (v.x - px) * (v.x - px) + (v.y - py) * (v.y - py) < 150.0 * 150.0);
+                    let near = pp.is_some_and(|(px, py)| {
+                        (v.x - px) * (v.x - px) + (v.y - py) * (v.y - py) < 150.0 * 150.0
+                    });
                     v.role == VehicleRole::Civilian && v.mode == MotionMode::Lane && !near
                 })
                 .map(|v| v.id);
@@ -174,7 +222,15 @@ impl Spawner {
         }
         if police < self.opts.police {
             if let Some((lane, s)) = self.find_spot(sim, md, f64::INFINITY) {
-                self.create(sim, VehicleClass::Police, VehicleRole::Police, lane, s, 5.0, None);
+                self.create(
+                    sim,
+                    VehicleClass::Police,
+                    VehicleRole::Police,
+                    lane,
+                    s,
+                    5.0,
+                    None,
+                );
             }
         }
     }

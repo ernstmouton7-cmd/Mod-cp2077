@@ -54,7 +54,10 @@ pub struct JunctionState {
 
 impl JunctionState {
     pub fn reset(&mut self, lane: LaneId) {
-        *self = JunctionState { lane: Some(lane), ..Default::default() };
+        *self = JunctionState {
+            lane: Some(lane),
+            ..Default::default()
+        };
     }
 }
 
@@ -104,12 +107,21 @@ pub fn has_priority(sim: &Sim, o: ConnectorId, c: ConnectorId) -> bool {
         return a > b;
     }
     // Same movement class: traffic from the right goes first.
-    let d = angle_diff(net.approach(cc.approach).heading, net.approach(oc.approach).heading);
+    let d = angle_diff(
+        net.approach(cc.approach).heading,
+        net.approach(oc.approach).heading,
+    );
     d > 45.0 * DEG && d < 135.0 * DEG
 }
 
 /// Resolve the entry mode for connector `c` from signals and signs.
-pub fn entry_mode(sim: &Sim, d: &mut AIDriver, vi: usize, c: ConnectorId, dist_to_line: f64) -> EntryMode {
+pub fn entry_mode(
+    sim: &Sim,
+    d: &mut AIDriver,
+    vi: usize,
+    c: ConnectorId,
+    dist_to_line: f64,
+) -> EntryMode {
     let conn = sim.net.connector(c);
     let n = sim.net.node(conn.node);
     let ap = sim.net.approach(conn.approach);
@@ -130,11 +142,20 @@ pub fn entry_mode(sim: &Sim, d: &mut AIDriver, vi: usize, c: ConnectorId, dist_t
                 if d.js.yellow.is_none() {
                     let sp = speed.abs();
                     let need = (sp * sp) / (2.0 * dist_to_line.max(0.1));
-                    let threshold = lerp(4.6, 2.0, d.p.aggression) * lerp(0.85, 1.1, d.p.lawfulness);
+                    let threshold =
+                        lerp(4.6, 2.0, d.p.aggression) * lerp(0.85, 1.1, d.p.lawfulness);
                     let too_close = dist_to_line < sp * 0.8;
-                    d.js.yellow = Some(if need <= threshold && !too_close { YellowChoice::Stop } else { YellowChoice::Go });
+                    d.js.yellow = Some(if need <= threshold && !too_close {
+                        YellowChoice::Stop
+                    } else {
+                        YellowChoice::Go
+                    });
                     if d.mood == Mood::Furious || d.raging {
-                        d.js.yellow = Some(if need < 1.2 { YellowChoice::Stop } else { YellowChoice::Go });
+                        d.js.yellow = Some(if need < 1.2 {
+                            YellowChoice::Stop
+                        } else {
+                            YellowChoice::Go
+                        });
                     }
                 }
                 if d.js.yellow == Some(YellowChoice::Go) {
@@ -152,7 +173,9 @@ pub fn entry_mode(sim: &Sim, d: &mut AIDriver, vi: usize, c: ConnectorId, dist_t
                 }
                 if !d.js.red_decided && dist_to_line > 25.0 && speed.abs() > 8.0 {
                     d.js.red_decided = true;
-                    let chance = (1.0 - d.p.lawfulness) * 0.08 + if d.raging { 0.5 } else { 0.0 } + if d.mood == Mood::Furious { 0.15 } else { 0.0 };
+                    let chance = (1.0 - d.p.lawfulness) * 0.08
+                        + if d.raging { 0.5 } else { 0.0 }
+                        + if d.mood == Mood::Furious { 0.15 } else { 0.0 };
                     if d.roll() < chance {
                         d.js.red_run = true;
                     }
@@ -206,7 +229,15 @@ pub fn time_to_cover(speed: f64, dist: f64, a: f64, vmax: f64) -> f64 {
 
 /// Vehicles already inside the junction on conflicting paths that would still
 /// be in a shared zone when we arrive (applies regardless of priority).
-fn committed_block(sim: &Sim, c: ConnectorId, me: VehicleId, me_half: f64, s_me: f64, speed: f64, strict: bool) -> bool {
+fn committed_block(
+    sim: &Sim,
+    c: ConnectorId,
+    me: VehicleId,
+    me_half: f64,
+    s_me: f64,
+    speed: f64,
+    strict: bool,
+) -> bool {
     for z in &sim.net.connector(c).conflicts {
         if z.s1 < s_me - me_half {
             continue;
@@ -240,7 +271,14 @@ fn committed_block(sim: &Sim, c: ConnectorId, me: VehicleId, me_half: f64, s_me:
 }
 
 /// Gap acceptance against movements with priority.
-fn priority_block(sim: &Sim, d: &AIDriver, vi: usize, c: ConnectorId, dist_to_line: f64, gap_scale: f64) -> bool {
+fn priority_block(
+    sim: &Sim,
+    d: &AIDriver,
+    vi: usize,
+    c: ConnectorId,
+    dist_to_line: f64,
+    gap_scale: f64,
+) -> bool {
     let me = &sim.vehicles[vi];
     let a = 2.0;
     let conn = sim.net.connector(c);
@@ -260,7 +298,11 @@ fn priority_block(sim: &Sim, d: &AIDriver, vi: usize, c: ConnectorId, dist_to_li
                 continue;
             }
             let dist = z.os0 - e.s - e.length / 2.0;
-            let t = if dist <= 0.0 { 0.0 } else { dist / e.v.max(0.5) };
+            let t = if dist <= 0.0 {
+                0.0
+            } else {
+                dist / e.v.max(0.5)
+            };
             if e.v < 0.5 && dist > 2.0 {
                 continue;
             }
@@ -306,7 +348,13 @@ fn box_blocked(sim: &Sim, c: ConnectorId, me: VehicleId, me_len: f64) -> bool {
             min_v = e.v;
         }
     }
-    let on_c: f64 = sim.occ.connector(c).iter().filter(|e| e.vehicle != me).map(|e| e.length + 2.0).sum();
+    let on_c: f64 = sim
+        .occ
+        .connector(c)
+        .iter()
+        .filter(|e| e.vehicle != me)
+        .map(|e| e.length + 2.0)
+        .sum();
     if min_s == f64::INFINITY {
         return on_c > conn.length + 4.0;
     }
@@ -315,7 +363,10 @@ fn box_blocked(sim: &Sim, c: ConnectorId, me: VehicleId, me_len: f64) -> bool {
 
 /// Another car is already waiting inside the box on our movement.
 fn connector_has_waiter(sim: &Sim, c: ConnectorId, me: VehicleId) -> bool {
-    sim.occ.connector(c).iter().any(|e| e.vehicle != me && e.v < 1.5)
+    sim.occ
+        .connector(c)
+        .iter()
+        .any(|e| e.vehicle != me && e.v < 1.5)
 }
 
 fn first_conflict_start(sim: &Sim, c: ConnectorId) -> f64 {
@@ -332,15 +383,21 @@ fn first_conflict_start(sim: &Sim, c: ConnectorId) -> f64 {
 /// All-way stop: is it our turn among vehicles waiting at conflicting approaches?
 fn all_way_turn(sim: &Sim, me: VehicleId, c: ConnectorId) -> bool {
     let conn = sim.net.connector(c);
-    let Some(q) = sim.all_way.get(&conn.node) else { return false };
-    let Some(&mine) = q.get(&me) else { return false };
+    let Some(q) = sim.all_way.get(&conn.node) else {
+        return false;
+    };
+    let Some(&mine) = q.get(&me) else {
+        return false;
+    };
     for z in &conn.conflicts {
         let lane = sim.net.connector(z.other).from;
         for e in sim.occ.lane(lane) {
             if e.vehicle == me {
                 continue;
             }
-            let Some(&t) = q.get(&e.vehicle) else { continue };
+            let Some(&t) = q.get(&e.vehicle) else {
+                continue;
+            };
             let intent = sim.intent_of(e);
             if intent != Some(z.other) && intent.is_some() {
                 continue;
@@ -356,7 +413,14 @@ fn all_way_turn(sim: &Sim, me: VehicleId, c: ConnectorId) -> bool {
 /// Distance (from the front bumper) at which to stop for the junction
 /// reached via connector `c`, or infinity to proceed. Called on the lane
 /// leading into `c`.
-pub fn approach_stop_distance(sim: &mut Sim, d: &mut AIDriver, vi: usize, lane: LaneId, c: ConnectorId, dt: f64) -> f64 {
+pub fn approach_stop_distance(
+    sim: &mut Sim,
+    d: &mut AIDriver,
+    vi: usize,
+    lane: LaneId,
+    c: ConnectorId,
+    dt: f64,
+) -> f64 {
     if d.js.lane != Some(lane) {
         d.js.reset(lane);
     }
@@ -409,16 +473,30 @@ pub fn approach_stop_distance(sim: &mut Sim, d: &mut AIDriver, vi: usize, lane: 
         }
     }
 
-    if committed_block(sim, c, me_id, me_half, -me_half - dist_to_line, sp.max(3.0), d.js.wait_time < 15.0) {
+    if committed_block(
+        sim,
+        c,
+        me_id,
+        me_half,
+        -me_half - dist_to_line,
+        sp.max(3.0),
+        d.js.wait_time < 15.0,
+    ) {
         d.js.wait_time += dt;
         d.js.reason = "junction occupied";
         return dist_to_line;
     }
-    if (mode == EntryMode::Yield || mode == EntryMode::Allway) && priority_block(sim, d, vi, c, dist_to_line, gap_scale) {
+    if (mode == EntryMode::Yield || mode == EntryMode::Allway)
+        && priority_block(sim, d, vi, c, dist_to_line, gap_scale)
+    {
         // Permissive left: pull into the box and wait at the conflict point.
         let ind = d.js.last_indication;
         let turn = sim.net.connector(c).turn;
-        if turn == TurnType::Left && (ind == Some(Indication::Permissive) || ind == Some(Indication::FlashYellow)) && !box_blocked(sim, c, me_id, me_len) && !connector_has_waiter(sim, c, me_id) {
+        if turn == TurnType::Left
+            && (ind == Some(Indication::Permissive) || ind == Some(Indication::FlashYellow))
+            && !box_blocked(sim, c, me_id, me_len)
+            && !connector_has_waiter(sim, c, me_id)
+        {
             d.js.reason = "waiting in box";
             return dist_to_line + first_conflict_start(sim, c) - 1.0;
         }
@@ -427,7 +505,12 @@ pub fn approach_stop_distance(sim: &mut Sim, d: &mut AIDriver, vi: usize, lane: 
         return dist_to_line;
     }
     // Don't block the box (unless this driver doesn't care today).
-    if d.js.lane == Some(lane) && !d.js.box_ignore && d.js.wait_time == 0.0 && d.p.lawfulness < 0.3 && d.roll() < 0.3 {
+    if d.js.lane == Some(lane)
+        && !d.js.box_ignore
+        && d.js.wait_time == 0.0
+        && d.p.lawfulness < 0.3
+        && d.roll() < 0.3
+    {
         d.js.box_ignore = true;
     }
     if !d.js.box_ignore && box_blocked(sim, c, me_id, me_len) {
@@ -441,7 +524,13 @@ pub fn approach_stop_distance(sim: &mut Sim, d: &mut AIDriver, vi: usize, lane: 
 
 /// While on a connector: distance to stop before a conflict zone that is
 /// still occupied (or contested by a priority movement for permissive lefts).
-pub fn connector_stop_distance(sim: &Sim, d: &mut AIDriver, vi: usize, c: ConnectorId, dt: f64) -> f64 {
+pub fn connector_stop_distance(
+    sim: &Sim,
+    d: &mut AIDriver,
+    vi: usize,
+    c: ConnectorId,
+    dt: f64,
+) -> f64 {
     let me = &sim.vehicles[vi];
     let front = me.s + me.half_len;
     let sp = me.speed.max(0.0);
@@ -483,7 +572,11 @@ pub fn connector_stop_distance(sim: &Sim, d: &mut AIDriver, vi: usize, c: Connec
                 continue;
             }
             let t_clear = (z.os1 - (e.s - half)) / e.v.max(1.0);
-            let t_them = if inside { 0.0 } else { (z.os0 - e.s - half).max(0.0) / e.v.max(0.5) };
+            let t_them = if inside {
+                0.0
+            } else {
+                (z.os0 - e.s - half).max(0.0) / e.v.max(0.5)
+            };
             if inside || (prio && t_them < t_arrive + 2.0) || t_clear > t_arrive - 0.2 {
                 blocked = true;
                 if e.v >= 0.5 {
@@ -495,7 +588,12 @@ pub fn connector_stop_distance(sim: &Sim, d: &mut AIDriver, vi: usize, c: Connec
         if !blocked && conn.turn == TurnType::Left && prio {
             let lane_id = sim.net.connector(o).from;
             let lane = sim.net.lane(lane_id);
-            let t_me = time_to_cover(sp, dist_to_zone + (z.s1 - z.s0) + me.length, 2.0, conn.speed_limit);
+            let t_me = time_to_cover(
+                sp,
+                dist_to_zone + (z.s1 - z.s0) + me.length,
+                2.0,
+                conn.speed_limit,
+            );
             for e in sim.occ.lane(lane_id) {
                 if e.vehicle == me.id || e.v < 1.0 {
                     continue;
@@ -526,7 +624,13 @@ pub fn connector_stop_distance(sim: &Sim, d: &mut AIDriver, vi: usize, c: Connec
 /// Distance (from the front bumper) at which to stop for pedestrians on a
 /// crosswalk that connector `c` crosses, or infinity. `ahead` is the distance
 /// from the bumper to the start of `c` (negative once on it).
-pub fn pedestrian_stop_distance(sim: &Sim, vi: usize, c: ConnectorId, ahead: f64, front_on_c: f64) -> f64 {
+pub fn pedestrian_stop_distance(
+    sim: &Sim,
+    vi: usize,
+    c: ConnectorId,
+    ahead: f64,
+    front_on_c: f64,
+) -> f64 {
     for x in &sim.crossings[c.idx()] {
         if x.s < front_on_c - 0.3 {
             continue;

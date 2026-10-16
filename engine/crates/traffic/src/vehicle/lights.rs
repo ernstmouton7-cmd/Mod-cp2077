@@ -170,7 +170,11 @@ impl VehicleLights {
 
     /// Toggle like a real stalk: pressing the active side cancels.
     pub fn toggle_indicator(&mut self, dir: Indicator) {
-        self.set_indicator(if self.indicator == dir { Indicator::Off } else { dir });
+        self.set_indicator(if self.indicator == dir {
+            Indicator::Off
+        } else {
+            dir
+        });
     }
 
     pub fn cycle_headlights(&mut self) {
@@ -213,7 +217,11 @@ impl VehicleLights {
         }
         if self.indicator != Indicator::Off {
             self.indicator_time += dt;
-            let toward = if self.indicator == Indicator::Left { steer } else { -steer };
+            let toward = if self.indicator == Indicator::Left {
+                steer
+            } else {
+                -steer
+            };
             if toward > 0.18 {
                 self.cancel_armed = true;
             } else if self.cancel_armed && toward < 0.04 {
@@ -223,7 +231,11 @@ impl VehicleLights {
             }
         }
         // Wipers: a sweep takes ~1.1 s (low), 0.7 s (high), intermittent pauses 3 s.
-        let sweep = if self.wipers == WiperMode::High { 0.7 } else { 1.1 };
+        let sweep = if self.wipers == WiperMode::High {
+            0.7
+        } else {
+            1.1
+        };
         if self.wipers == WiperMode::Off && self.wiper_dir == 0 {
             self.wiper_pos = 0.0;
             return;
@@ -241,7 +253,11 @@ impl VehicleLights {
             } else if self.wiper_pos <= 0.0 {
                 self.wiper_pos = 0.0;
                 self.wiper_dir = 0;
-                self.wiper_timer = if self.wipers == WiperMode::Intermittent { 3.0 } else { 0.0 };
+                self.wiper_timer = if self.wipers == WiperMode::Intermittent {
+                    3.0
+                } else {
+                    0.0
+                };
             }
         }
     }

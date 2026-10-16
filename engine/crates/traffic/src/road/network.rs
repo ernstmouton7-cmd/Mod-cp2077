@@ -284,10 +284,20 @@ impl Network {
         pts.push(Vec2::new(nb.x, nb.y));
         let center_path = Path::new(&pts);
         let lane_width = opts.lane_width.unwrap_or(3.5);
-        let median_width = opts.median_width.unwrap_or(if opts.lanes_back > 0 && opts.lanes_fwd > 0 { 0.3 } else { 0.0 });
+        let median_width =
+            opts.median_width
+                .unwrap_or(if opts.lanes_back > 0 && opts.lanes_fwd > 0 {
+                    0.3
+                } else {
+                    0.0
+                });
         let sidewalk_width = opts.sidewalk_width.unwrap_or(3.0);
         let n = (opts.lanes_fwd + opts.lanes_back) as f64;
-        let m = if opts.lanes_back == 0 || opts.lanes_fwd == 0 { 0.0 } else { median_width };
+        let m = if opts.lanes_back == 0 || opts.lanes_fwd == 0 {
+            0.0
+        } else {
+            median_width
+        };
         let road = Road {
             id,
             a,
@@ -375,7 +385,11 @@ impl Network {
 
     /// First connector out of `lane` into `road`.
     pub fn connector_to(&self, lane: LaneId, road: RoadId) -> Option<ConnectorId> {
-        self.lanes[lane.idx()].outgoing.iter().copied().find(|&c| self.lanes[self.connectors[c.idx()].to.idx()].road == road)
+        self.lanes[lane.idx()]
+            .outgoing
+            .iter()
+            .copied()
+            .find(|&c| self.lanes[self.connectors[c.idx()].to.idx()].road == road)
     }
 
     // ------------------------------------------------------------ building
@@ -460,18 +474,32 @@ impl Network {
         let (a, b, trim_a, trim_b) = (r.a, r.b, r.trim_a, r.trim_b);
         let mut new_lanes: Vec<(bool, usize, Path)> = Vec::new();
         for i in 0..n_f {
-            let off = if one_way { -(i as f64 + 0.5) * w + (n_f as f64 * w) / 2.0 } else { -(half_median + (i as f64 + 0.5) * w) };
+            let off = if one_way {
+                -(i as f64 + 0.5) * w + (n_f as f64 * w) / 2.0
+            } else {
+                -(half_median + (i as f64 + 0.5) * w)
+            };
             let pts = offset_polyline(&r.centerline, off);
             let full = Path::new(&pts);
-            let trimmed = Path::new(&full.slice(trim_a * (full.length / full_len), full.length - trim_b * (full.length / full_len)));
+            let trimmed = Path::new(&full.slice(
+                trim_a * (full.length / full_len),
+                full.length - trim_b * (full.length / full_len),
+            ));
             new_lanes.push((true, i, trimmed));
         }
         let rev: Vec<Vec2> = r.centerline.iter().rev().copied().collect();
         for i in 0..n_b {
-            let off = if one_way { -(i as f64 + 0.5) * w + (n_b as f64 * w) / 2.0 } else { -(half_median + (i as f64 + 0.5) * w) };
+            let off = if one_way {
+                -(i as f64 + 0.5) * w + (n_b as f64 * w) / 2.0
+            } else {
+                -(half_median + (i as f64 + 0.5) * w)
+            };
             let pts = offset_polyline(&rev, off);
             let full = Path::new(&pts);
-            let trimmed = Path::new(&full.slice(trim_b * (full.length / full_len), full.length - trim_a * (full.length / full_len)));
+            let trimmed = Path::new(&full.slice(
+                trim_b * (full.length / full_len),
+                full.length - trim_a * (full.length / full_len),
+            ));
             new_lanes.push((false, i, trimmed));
         }
         for (forward, index, path) in new_lanes {
@@ -502,12 +530,19 @@ impl Network {
                 r.lanes_ba.push(id);
             }
         }
-        let groups = [self.roads[rid.idx()].lanes_ab.clone(), self.roads[rid.idx()].lanes_ba.clone()];
+        let groups = [
+            self.roads[rid.idx()].lanes_ab.clone(),
+            self.roads[rid.idx()].lanes_ba.clone(),
+        ];
         for group in groups {
             for i in 0..group.len() {
                 let l = &mut self.lanes[group[i].idx()];
                 l.left = if i > 0 { Some(group[i - 1]) } else { None };
-                l.right = if i + 1 < group.len() { Some(group[i + 1]) } else { None };
+                l.right = if i + 1 < group.len() {
+                    Some(group[i + 1])
+                } else {
+                    None
+                };
             }
         }
     }
@@ -626,7 +661,11 @@ impl Network {
             for &(orid, turn) in &outs {
                 let out_lanes = self.roads[orid.idx()].lanes_out_of(nid).to_vec();
                 let m = out_lanes.len() as i64;
-                let users: Vec<LaneId> = in_lanes.iter().copied().filter(|&l| self.lanes[l.idx()].has_turn(turn)).collect();
+                let users: Vec<LaneId> = in_lanes
+                    .iter()
+                    .copied()
+                    .filter(|&l| self.lanes[l.idx()].has_turn(turn))
+                    .collect();
                 for (u, &from) in users.iter().enumerate() {
                     let u = u as i64;
                     let pick = |i: i64| out_lanes[i.clamp(0, m - 1) as usize];
@@ -683,7 +722,13 @@ impl Network {
         }
     }
 
-    fn make_connector(&mut self, n: NodeId, from: LaneId, to: LaneId, turn: TurnType) -> ConnectorId {
+    fn make_connector(
+        &mut self,
+        n: NodeId,
+        from: LaneId,
+        to: LaneId,
+        turn: TurnType,
+    ) -> ConnectorId {
         let fl = &self.lanes[from.idx()];
         let tl = &self.lanes[to.idx()];
         let a = fl.path.sample(fl.length);
@@ -698,7 +743,11 @@ impl Network {
         let pts = if turn == TurnType::Straight && angle_diff(h0, h3).abs() < 5.0 * DEG {
             vec![p0, p3]
         } else {
-            let k = if turn == TurnType::UTurn { (d * 1.2).max(4.0) } else { d * 0.45 };
+            let k = if turn == TurnType::UTurn {
+                (d * 1.2).max(4.0)
+            } else {
+                d * 0.45
+            };
             let p1 = Vec2::new(p0.x + h0.cos() * k, p0.y + h0.sin() * k);
             let p2 = Vec2::new(p3.x - h3.cos() * k, p3.y - h3.sin() * k);
             cubic_bezier(p0, p1, p2, p3, 16)
@@ -709,12 +758,18 @@ impl Network {
         let mut max_curv: f64 = 0.0;
         let steps = ((path.length / 2.0).floor() as usize).max(2);
         for i in 1..steps {
-            let c = path.curvature_at((path.length * i as f64) / steps as f64, 1.5).abs();
+            let c = path
+                .curvature_at((path.length * i as f64) / steps as f64, 1.5)
+                .abs();
             if c > max_curv {
                 max_curv = c;
             }
         }
-        let turn_speed = if max_curv > 1e-4 { (2.6 / max_curv).sqrt() } else { 99.0 };
+        let turn_speed = if max_curv > 1e-4 {
+            (2.6 / max_curv).sqrt()
+        } else {
+            99.0
+        };
         let speed_limit = fl.speed_limit.max(tl.speed_limit).min(turn_speed.max(3.5));
         let approach = fl.approach.expect("connector from a lane without approach");
         let id = ConnectorId::from(self.connectors.len());
@@ -771,7 +826,11 @@ impl Network {
                 if s0 < 0.0 {
                     continue;
                 }
-                let kind = if merge { ConflictKind::Merge } else { ConflictKind::Cross };
+                let kind = if merge {
+                    ConflictKind::Merge
+                } else {
+                    ConflictKind::Cross
+                };
                 if merge {
                     s1 = a.length;
                     os1 = b.length;
@@ -808,10 +867,20 @@ impl Network {
             let pr = self.lanes[l.idx()].path.project(x, y);
             let d = pr.d2.sqrt();
             if d <= radius {
-                out.push(LaneHit { lane: l, s: pr.s, lateral: pr.lateral, dist: d });
+                out.push(LaneHit {
+                    lane: l,
+                    s: pr.s,
+                    lateral: pr.lateral,
+                    dist: d,
+                });
             }
         }
-        out.sort_by(|a, b| a.dist.partial_cmp(&b.dist).unwrap_or(std::cmp::Ordering::Equal).then(a.lane.cmp(&b.lane)));
+        out.sort_by(|a, b| {
+            a.dist
+                .partial_cmp(&b.dist)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.lane.cmp(&b.lane))
+        });
         out
     }
 

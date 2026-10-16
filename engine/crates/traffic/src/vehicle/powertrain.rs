@@ -158,7 +158,12 @@ impl Powertrain {
     pub fn torque_at(&self, rpm: f64, throttle: f64) -> f64 {
         let full = curve(self.spec.torque_curve, rpm);
         let health_factor = 0.35 + 0.65 * clamp(self.health, 0.0, 1.0);
-        let drag = self.spec.engine_brake * clamp((rpm - self.spec.idle_rpm * 1.05) / (self.spec.redline - self.spec.idle_rpm), 0.0, 1.2);
+        let drag = self.spec.engine_brake
+            * clamp(
+                (rpm - self.spec.idle_rpm * 1.05) / (self.spec.redline - self.spec.idle_rpm),
+                0.0,
+                1.2,
+            );
         throttle * full * health_factor - (1.0 - throttle) * drag
     }
 
@@ -166,7 +171,14 @@ impl Powertrain {
     ///
     /// `wheel_omega`: driven wheel speed (rad/s, signed); `speed`: forward
     /// speed (m/s); `torque_scale`: TCS/ESC torque cut (does not affect shifting).
-    pub fn update(&mut self, dt: f64, wheel_omega: f64, mut throttle: f64, speed: f64, torque_scale: f64) -> f64 {
+    pub fn update(
+        &mut self,
+        dt: f64,
+        wheel_omega: f64,
+        mut throttle: f64,
+        speed: f64,
+        torque_scale: f64,
+    ) -> f64 {
         let spec = self.spec;
         self.since_shift += dt;
         if self.cranking > 0.0 {
@@ -196,25 +208,39 @@ impl Powertrain {
         }
         let ratio = self.ratio(self.gear) * spec.final_drive;
         let engaged = self.gear != 0 && self.shift_timer <= 0.0;
-        let mut couple = if engaged { 1.0 - self.clutch_pedal } else { 0.0 };
+        let mut couple = if engaged {
+            1.0 - self.clutch_pedal
+        } else {
+            0.0
+        };
         if !self.running {
             self.rpm = (self.rpm - 3000.0 * dt).max(0.0);
             self.engine_torque = 0.0;
             self.load = 0.0;
             // A stopped engine still resists wheel motion through the gearbox.
-            return if engaged { -sign(wheel_omega) * (wheel_omega.abs() * 4.0).min(40.0) * ratio.abs() * couple } else { 0.0 };
+            return if engaged {
+                -sign(wheel_omega) * (wheel_omega.abs() * 4.0).min(40.0) * ratio.abs() * couple
+            } else {
+                0.0
+            };
         }
         let wheel_rpm = (wheel_omega * ratio).abs() * RPM_PER_RADS;
         let free_rev = spec.idle_rpm + throttle * (spec.redline - spec.idle_rpm);
         let target_rpm;
         if couple > 0.05 {
             if self.mode == TransmissionMode::Automatic {
-                let stall = spec.idle_rpm + throttle * 2400f64.min((spec.redline - spec.idle_rpm) * 0.45);
+                let stall =
+                    spec.idle_rpm + throttle * 2400f64.min((spec.redline - spec.idle_rpm) * 0.45);
                 target_rpm = wheel_rpm.max(stall).max(spec.idle_rpm);
             } else {
                 let slip = 1.0 - couple;
                 let t = wheel_rpm * couple + free_rev * slip;
-                if wheel_rpm < spec.idle_rpm * 0.55 && couple > 0.9 && throttle < 0.6 && speed.abs() < 2.5 && self.gear != 0 {
+                if wheel_rpm < spec.idle_rpm * 0.55
+                    && couple > 0.9
+                    && throttle < 0.6
+                    && speed.abs() < 2.5
+                    && self.gear != 0
+                {
                     // Lugging below idle with the clutch out: stall.
                     self.running = false;
                     self.stalled = true;
@@ -243,7 +269,11 @@ impl Powertrain {
         self.rpm = self.rpm.min(spec.redline + 150.0);
 
         let mut tq = self.torque_at(self.rpm, eff_throttle);
-        if self.mode == TransmissionMode::Automatic && couple > 0.0 && eff_throttle < 0.05 && wheel_rpm < spec.idle_rpm * 1.3 {
+        if self.mode == TransmissionMode::Automatic
+            && couple > 0.0
+            && eff_throttle < 0.05
+            && wheel_rpm < spec.idle_rpm * 1.3
+        {
             tq = tq.max(curve(spec.torque_curve, spec.idle_rpm) * 0.12);
         }
         if self.mode == TransmissionMode::Automatic && couple > 0.0 && wheel_rpm < self.rpm * 0.85 {
@@ -281,8 +311,11 @@ impl Powertrain {
         } else if self.gear > 1 {
             let lower_ratio = self.ratio(self.gear - 1) * spec.final_drive;
             let rpm_lower = (speed.abs() / spec.wheel_radius) * lower_ratio * RPM_PER_RADS;
-            let lower_up_at = spec.idle_rpm + (spec.redline - spec.idle_rpm) * (0.35 + 0.6 * throttle);
-            let kickdown = throttle > 0.9 && rpm_lower < (spec.redline * 0.8).min(lower_up_at * 0.9) && rpm < spec.redline * 0.5;
+            let lower_up_at =
+                spec.idle_rpm + (spec.redline - spec.idle_rpm) * (0.35 + 0.6 * throttle);
+            let kickdown = throttle > 0.9
+                && rpm_lower < (spec.redline * 0.8).min(lower_up_at * 0.9)
+                && rpm < spec.redline * 0.5;
             if rpm < down_at || (kickdown && (settled || self.last_shift_dir < 0)) {
                 self.shift_to(self.gear - 1);
             }

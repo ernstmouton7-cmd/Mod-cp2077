@@ -7,7 +7,13 @@ use std::collections::HashSet;
 
 #[test]
 fn pedestrians_cross_with_the_walk_signal_and_traffic_yields_to_them() {
-    let mut world = World::new(WorldOptions { seed: 5, traffic: 110, no_player: true, start_hour: 12.0, ..Default::default() });
+    let mut world = World::new(WorldOptions {
+        seed: 5,
+        traffic: 110,
+        no_player: true,
+        start_hour: 12.0,
+        ..Default::default()
+    });
     world.env_mut().time_scale = 0.0;
     let mut hits = 0;
     let mut shouts = 0;
@@ -29,7 +35,10 @@ fn pedestrians_cross_with_the_walk_signal_and_traffic_yields_to_them() {
             if p.state == PedState::Crossing && started.insert(p.id) {
                 crossings += 1;
                 let cw = &world.peds().crosswalks[p.cw.idx()];
-                if world.net().node(cw.node).control == ControlType::Signal && !world.walk_allowed(p.cw, true) && p.waited < 120.0 {
+                if world.net().node(cw.node).control == ControlType::Signal
+                    && !world.walk_allowed(p.cw, true)
+                    && p.waited < 120.0
+                {
                     crossed_on_dont_walk += 1;
                 }
             }
@@ -38,6 +47,9 @@ fn pedestrians_cross_with_the_walk_signal_and_traffic_yields_to_them() {
     println!("peds max={max_peds} crossings={crossings} startedOnDontWalk={crossed_on_dont_walk} hits={hits} shouts={shouts} collisions={}", world.stats().collisions);
     assert!(max_peds > 15, "pedestrians spawn");
     assert!(crossings > 100, "they cross");
-    assert_eq!(crossed_on_dont_walk, 0, "nobody starts on a solid don't-walk");
+    assert_eq!(
+        crossed_on_dont_walk, 0,
+        "nobody starts on a solid don't-walk"
+    );
     assert!(hits <= 1, "AI drivers hit {hits} pedestrians");
 }

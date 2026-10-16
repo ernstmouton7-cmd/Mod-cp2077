@@ -70,7 +70,12 @@ impl Path {
             cum.push(1e-3);
             total = 1e-3;
         }
-        Path { xs, ys, cum, length: total }
+        Path {
+            xs,
+            ys,
+            cum,
+            length: total,
+        }
     }
 
     /// Index i such that cum[i] <= s < cum[i+1].
@@ -103,11 +108,19 @@ impl Path {
         let x1 = self.xs[i + 1];
         let y1 = self.ys[i + 1];
         let seg_len = self.cum[i + 1] - self.cum[i];
-        let mut t = if seg_len > 0.0 { (s - self.cum[i]) / seg_len } else { 0.0 };
+        let mut t = if seg_len > 0.0 {
+            (s - self.cum[i]) / seg_len
+        } else {
+            0.0
+        };
         if i == 0 && t < 0.0 {
             t = (s - self.cum[0]) / seg_len;
         }
-        PathSample { x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t, heading: (y1 - y0).atan2(x1 - x0) }
+        PathSample {
+            x: x0 + (x1 - x0) * t,
+            y: y0 + (y1 - y0) * t,
+            heading: (y1 - y0).atan2(x1 - x0),
+        }
     }
 
     pub fn heading_at(&self, s: f64) -> f64 {
@@ -141,7 +154,11 @@ impl Path {
             let dx = self.xs[i + 1] - x0;
             let dy = self.ys[i + 1] - y0;
             let l2 = dx * dx + dy * dy;
-            let mut t = if l2 > 0.0 { ((px - x0) * dx + (py - y0) * dy) / l2 } else { 0.0 };
+            let mut t = if l2 > 0.0 {
+                ((px - x0) * dx + (py - y0) * dy) / l2
+            } else {
+                0.0
+            };
             t = t.clamp(0.0, 1.0);
             let cx = x0 + dx * t;
             let cy = y0 + dy * t;
@@ -152,14 +169,26 @@ impl Path {
                 best = d2;
                 best_s = self.cum[i] + t * (self.cum[i + 1] - self.cum[i]);
                 let l = l2.sqrt();
-                best_lat = if l > 0.0 { (dx * ey - dy * ex) / l } else { 0.0 };
+                best_lat = if l > 0.0 {
+                    (dx * ey - dy * ex) / l
+                } else {
+                    0.0
+                };
             }
         }
-        Projection { s: best_s, lateral: best_lat, d2: best }
+        Projection {
+            s: best_s,
+            lateral: best_lat,
+            d2: best,
+        }
     }
 
     pub fn points(&self) -> Vec<Vec2> {
-        self.xs.iter().zip(&self.ys).map(|(&x, &y)| Vec2::new(x, y)).collect()
+        self.xs
+            .iter()
+            .zip(&self.ys)
+            .map(|(&x, &y)| Vec2::new(x, y))
+            .collect()
     }
 
     /// Points of the sub-range [s0, s1] (for trimmed geometry and rendering).
@@ -221,7 +250,10 @@ pub fn offset_polyline(points: &[Vec2], offset: f64) -> Vec<Vec2> {
                 }
             }
         }
-        out.push(Vec2::new(points[i].x + nx * offset * k, points[i].y + ny * offset * k));
+        out.push(Vec2::new(
+            points[i].x + nx * offset * k,
+            points[i].y + ny * offset * k,
+        ));
     }
     out
 }
@@ -236,14 +268,26 @@ pub fn cubic_bezier(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, steps: usize) -> Vec
             let b = 3.0 * u * u * t;
             let c = 3.0 * u * t * t;
             let d = t * t * t;
-            Vec2::new(a * p0.x + b * p1.x + c * p2.x + d * p3.x, a * p0.y + b * p1.y + c * p2.y + d * p3.y)
+            Vec2::new(
+                a * p0.x + b * p1.x + c * p2.x + d * p3.x,
+                a * p0.y + b * p1.y + c * p2.y + d * p3.y,
+            )
         })
         .collect()
 }
 
 /// Intersection of segments p1-p2 and p3-p4 as parameters `(t, u)` on each.
 #[allow(clippy::too_many_arguments)]
-pub fn segment_intersect(x1: f64, y1: f64, x2: f64, y2: f64, x3: f64, y3: f64, x4: f64, y4: f64) -> Option<(f64, f64)> {
+pub fn segment_intersect(
+    x1: f64,
+    y1: f64,
+    x2: f64,
+    y2: f64,
+    x3: f64,
+    y3: f64,
+    x4: f64,
+    y4: f64,
+) -> Option<(f64, f64)> {
     let d = (x2 - x1) * (y4 - y3) - (y2 - y1) * (x4 - x3);
     if d.abs() < 1e-12 {
         return None;
@@ -261,7 +305,16 @@ pub fn path_crossing(a: &Path, b: &Path) -> Option<(f64, f64)> {
     let mut best: Option<(f64, f64)> = None;
     for i in 0..a.xs.len() - 1 {
         for j in 0..b.xs.len() - 1 {
-            if let Some((t, u)) = segment_intersect(a.xs[i], a.ys[i], a.xs[i + 1], a.ys[i + 1], b.xs[j], b.ys[j], b.xs[j + 1], b.ys[j + 1]) {
+            if let Some((t, u)) = segment_intersect(
+                a.xs[i],
+                a.ys[i],
+                a.xs[i + 1],
+                a.ys[i + 1],
+                b.xs[j],
+                b.ys[j],
+                b.xs[j + 1],
+                b.ys[j + 1],
+            ) {
                 let sa = a.cum[i] + t * (a.cum[i + 1] - a.cum[i]);
                 let sb = b.cum[j] + u * (b.cum[j + 1] - b.cum[j]);
                 if best.is_none_or(|bst| sa < bst.0) {

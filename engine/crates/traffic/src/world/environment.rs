@@ -78,8 +78,19 @@ impl Environment {
         self.dark = self.daylight < 0.45 || self.fog > 0.6;
         self.grip = 1.0 - 0.32 * self.wetness;
         let night = 1.0 - self.daylight;
-        self.visibility = clamp(1200.0 * (1.0 - self.fog * 0.9) * (1.0 - self.rain * 0.5) * (1.0 - night * 0.4), 40.0, 1200.0);
-        self.traffic_density = clamp(0.25 + 0.75 * bell(h, 8.2, 1.4) + 0.85 * bell(h, 17.6, 1.7) + 0.45 * bell(h, 13.0, 2.5) + 0.25 * bell(h, 21.5, 1.5), 0.2, 1.1);
+        self.visibility = clamp(
+            1200.0 * (1.0 - self.fog * 0.9) * (1.0 - self.rain * 0.5) * (1.0 - night * 0.4),
+            40.0,
+            1200.0,
+        );
+        self.traffic_density = clamp(
+            0.25 + 0.75 * bell(h, 8.2, 1.4)
+                + 0.85 * bell(h, 17.6, 1.7)
+                + 0.45 * bell(h, 13.0, 2.5)
+                + 0.25 * bell(h, 21.5, 1.5),
+            0.2,
+            1.1,
+        );
         self.night_flash = (1.0..5.0).contains(&h);
     }
 
@@ -93,7 +104,13 @@ impl Environment {
         if self.auto_weather {
             self.weather_timer -= dt;
             if self.weather_timer <= 0.0 {
-                self.weather = self.rng.weighted(&[(Weather::Clear, 45.0), (Weather::Cloudy, 25.0), (Weather::Rain, 18.0), (Weather::Storm, 6.0), (Weather::Fog, 6.0)]);
+                self.weather = self.rng.weighted(&[
+                    (Weather::Clear, 45.0),
+                    (Weather::Cloudy, 25.0),
+                    (Weather::Rain, 18.0),
+                    (Weather::Storm, 6.0),
+                    (Weather::Fog, 6.0),
+                ]);
                 self.weather_timer = self.rng.range(400.0, 1200.0);
             }
         }
@@ -109,8 +126,19 @@ impl Environment {
         };
         self.rain += (target_rain - self.rain) * (dt * 0.1).min(1.0);
         self.fog += (target_fog - self.fog) * (dt * 0.05).min(1.0);
-        let wet_target = if self.rain > 0.05 { (self.rain * 1.5).min(1.0) } else { 0.0 };
-        self.wetness += (wet_target - self.wetness) * (dt * if wet_target > self.wetness { 0.08 } else { 0.01 }).min(1.0);
+        let wet_target = if self.rain > 0.05 {
+            (self.rain * 1.5).min(1.0)
+        } else {
+            0.0
+        };
+        self.wetness += (wet_target - self.wetness)
+            * (dt
+                * if wet_target > self.wetness {
+                    0.08
+                } else {
+                    0.01
+                })
+            .min(1.0);
         self.refresh();
     }
 }

@@ -6,4 +6,6 @@ pub mod violations;
 
 pub use player_monitor::{AheadControl, AheadInfo, HitRun, Observation, PlayerMonitor, RoadInfo};
 pub use police::{PoliceStage, PoliceSystem};
-pub use violations::{DrivingRecord, TicketSummary, ViolationDef, ViolationKind, ViolationRecord, Witness};
+pub use violations::{
+    DrivingRecord, TicketSummary, ViolationDef, ViolationKind, ViolationRecord, Witness,
+};

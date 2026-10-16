@@ -24,7 +24,13 @@ pub struct DamageModel {
 
 impl Default for DamageModel {
     fn default() -> Self {
-        DamageModel { front: 1.0, rear: 1.0, left: 1.0, right: 1.0, impacts: 0.0 }
+        DamageModel {
+            front: 1.0,
+            rear: 1.0,
+            left: 1.0,
+            right: 1.0,
+            impacts: 0.0,
+        }
     }
 }
 
@@ -40,7 +46,14 @@ impl DamageModel {
 
     /// Apply an impact at body-frame point (x forward) with `severity` = Δv
     /// (m/s). Returns the zone hit and the health lost.
-    pub fn hit(&mut self, local_x: f64, local_y: f64, half_len: f64, half_wid: f64, severity: f64) -> (DamageZone, f64) {
+    pub fn hit(
+        &mut self,
+        local_x: f64,
+        local_y: f64,
+        half_len: f64,
+        half_wid: f64,
+        severity: f64,
+    ) -> (DamageZone, f64) {
         let nx = local_x / half_len;
         let ny = local_y / half_wid;
         let zone = if nx.abs() >= ny.abs() {

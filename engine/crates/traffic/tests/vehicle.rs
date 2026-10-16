@@ -1,7 +1,9 @@
 //! Port of tests/vehicle.test.ts.
 
 use gridlock_traffic::vehicle::{HeadlightSwitch, Indicator, TransmissionMode};
-use gridlock_traffic::{spec, MotionMode, Vehicle, VehicleClass, VehicleId, VehicleLights, VehicleRole};
+use gridlock_traffic::{
+    spec, MotionMode, Vehicle, VehicleClass, VehicleId, VehicleLights, VehicleRole,
+};
 
 const DT: f64 = 1.0 / 60.0;
 
@@ -14,7 +16,13 @@ fn car(cls: VehicleClass) -> Vehicle {
 
 fn step(v: &mut Vehicle, grip: f64) {
     let scale = if v.dynamics.tcs_active { 0.4 } else { 1.0 };
-    let t = v.pt.update(DT, v.dynamics.driven_omega(), v.inputs.throttle, v.dynamics.u, scale);
+    let t = v.pt.update(
+        DT,
+        v.dynamics.driven_omega(),
+        v.inputs.throttle,
+        v.dynamics.u,
+        scale,
+    );
     v.dynamics.surface_grip = grip;
     let (inputs, steer, assists) = (v.inputs, v.steer_target, v.assists);
     v.dynamics.step(DT, &inputs, t, steer, &assists);
@@ -68,7 +76,10 @@ fn braking_dry_wet_and_without_abs() {
     let dry = braking_distance(VehicleClass::Sedan, true, 1.0);
     let wet = braking_distance(VehicleClass::Sedan, true, 0.68);
     let no_abs = braking_distance(VehicleClass::Sedan, false, 1.0);
-    println!("braking: dry ABS {:.1} m, wet ABS {:.1} m, dry no-ABS {:.1} m", dry.0, wet.0, no_abs.0);
+    println!(
+        "braking: dry ABS {:.1} m, wet ABS {:.1} m, dry no-ABS {:.1} m",
+        dry.0, wet.0, no_abs.0
+    );
     assert!(dry.0 > 32.0 && dry.0 < 52.0, "dry {}", dry.0);
     assert!(wet.0 > dry.0 * 1.25, "wet road is longer");
     assert!(!dry.1, "ABS prevents lock-up");
@@ -88,7 +99,10 @@ fn steady_cornering_stays_within_the_friction_limit() {
         step(&mut v, 1.0);
         max_lat = max_lat.max(v.dynamics.ay.abs());
     }
-    assert!(max_lat < spec(VehicleClass::Sports).grip * 9.81 * 1.15, "lateral accel {max_lat:.1} m/s²");
+    assert!(
+        max_lat < spec(VehicleClass::Sports).grip * 9.81 * 1.15,
+        "lateral accel {max_lat:.1} m/s²"
+    );
     assert!(v.dynamics.r.abs() > 0.2, "car turns");
 }
 
@@ -108,7 +122,11 @@ fn handbrake_at_speed_locks_the_rear_and_rotates_the_car() {
         max_skid = max_skid.max(v.dynamics.skid);
     }
     assert!(rear_locked, "rear axle locks");
-    assert!(v.dynamics.yaw.abs() > 0.6, "rotated {:.2} rad", v.dynamics.yaw);
+    assert!(
+        v.dynamics.yaw.abs() > 0.6,
+        "rotated {:.2} rad",
+        v.dynamics.yaw
+    );
     assert!(max_skid > 0.5, "tyres skid");
 }
 
@@ -140,7 +158,11 @@ fn automatic_creeps_manual_stalls_when_the_clutch_is_dumped() {
     for _ in 0..60 * 6 {
         step(&mut a, 1.0);
     }
-    assert!(a.dynamics.u > 0.5 && a.dynamics.u < 4.0, "creep speed {:.2} m/s", a.dynamics.u);
+    assert!(
+        a.dynamics.u > 0.5 && a.dynamics.u < 4.0,
+        "creep speed {:.2} m/s",
+        a.dynamics.u
+    );
     let mut m = car(VehicleClass::Sedan);
     m.pt.mode = TransmissionMode::Manual;
     m.pt.gear = 1;
@@ -169,7 +191,10 @@ fn automatic_shifts_up_through_the_gears_and_holds_below_redline() {
         max_rpm = max_rpm.max(v.pt.rpm);
     }
     assert!(max_gear >= 5, "reached gear {max_gear}");
-    assert!(max_rpm <= spec(VehicleClass::Sedan).redline + 200.0, "rpm {max_rpm:.0}");
+    assert!(
+        max_rpm <= spec(VehicleClass::Sedan).redline + 200.0,
+        "rpm {max_rpm:.0}"
+    );
 }
 
 #[test]
@@ -208,7 +233,10 @@ fn indicators_relay_timing_toggling_hazards_and_auto_cancel() {
         prev = s;
     }
     let blinks_per_min = edges as f64 / 2.0 / (7.0 / 60.0);
-    assert!(blinks_per_min > 60.0 && blinks_per_min < 120.0, "{blinks_per_min:.0} blinks/min");
+    assert!(
+        blinks_per_min > 60.0 && blinks_per_min < 120.0,
+        "{blinks_per_min:.0} blinks/min"
+    );
     assert!(!l.right_lamp_on());
     l.toggle_indicator(Indicator::Left);
     assert_eq!(l.indicator, Indicator::Off, "pressing again cancels");
@@ -220,7 +248,11 @@ fn indicators_relay_timing_toggling_hazards_and_auto_cancel() {
     for _ in 0..30 {
         l.update(DT, 0.0);
     }
-    assert_eq!(l.indicator, Indicator::Off, "auto-cancel after the wheel returns");
+    assert_eq!(
+        l.indicator,
+        Indicator::Off,
+        "auto-cancel after the wheel returns"
+    );
     l.hazard = true;
     let mut both = false;
     for _ in 0..60 {

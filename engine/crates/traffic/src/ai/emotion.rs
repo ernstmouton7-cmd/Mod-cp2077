@@ -67,7 +67,13 @@ impl OffenseKind {
 
     /// Continuous offenses do not produce `offense` events or reactions.
     pub fn is_continuous(self) -> bool {
-        matches!(self, OffenseKind::Tailgating | OffenseKind::Blocked | OffenseKind::SlowDriver | OffenseKind::LongWait)
+        matches!(
+            self,
+            OffenseKind::Tailgating
+                | OffenseKind::Blocked
+                | OffenseKind::SlowDriver
+                | OffenseKind::LongWait
+        )
     }
 }
 
@@ -119,7 +125,13 @@ impl Emotion {
     }
 
     /// Apply an offense (`offender` None = situational: no grudge). Returns the anger gained.
-    pub fn offend(&mut self, offender: Option<VehicleId>, kind: OffenseKind, scale: f64, now: f64) -> f64 {
+    pub fn offend(
+        &mut self,
+        offender: Option<VehicleId>,
+        kind: OffenseKind,
+        scale: f64,
+        now: f64,
+    ) -> f64 {
         let mut forgiveness = 1.0;
         if let Some(o) = offender {
             for f in &self.forgiven {
@@ -128,13 +140,20 @@ impl Emotion {
                 }
             }
         }
-        let gain = kind.base_anger() * scale * self.p.temper * (1.0 + self.stress * 0.6) * forgiveness;
+        let gain =
+            kind.base_anger() * scale * self.p.temper * (1.0 + self.stress * 0.6) * forgiveness;
         self.anger = clamp(self.anger + gain, 0.0, 100.0);
-        let Some(offender) = offender else { return gain };
+        let Some(offender) = offender else {
+            return gain;
+        };
         let gi = match self.grudges.iter().rposition(|g| g.id == offender) {
             Some(i) => i,
             None => {
-                self.grudges.push(Grudge { id: offender, amount: 0.0, last: now });
+                self.grudges.push(Grudge {
+                    id: offender,
+                    amount: 0.0,
+                    last: now,
+                });
                 self.grudges.len() - 1
             }
         };
@@ -150,7 +169,9 @@ impl Emotion {
 
     /// Offender apologised (wave / hazard "thank you"). Returns anger removed.
     pub fn apologize(&mut self, offender: VehicleId, now: f64) -> f64 {
-        let Some(gi) = self.grudges.iter().rposition(|g| g.id == offender) else { return 0.0 };
+        let Some(gi) = self.grudges.iter().rposition(|g| g.id == offender) else {
+            return 0.0;
+        };
         let recent = now - self.grudges[gi].last < 10.0;
         let base = if recent { 26.0 } else { 10.0 };
         let calmed = base * (1.2 - self.p.aggression * 0.7);
@@ -158,7 +179,11 @@ impl Emotion {
         self.anger = clamp(self.anger - calmed, 0.0, 100.0);
         let g = &mut self.grudges[gi];
         g.amount = (g.amount - calmed * 1.5).max(0.0);
-        self.forgiven.push(Grudge { id: offender, amount: 0.0, last: now });
+        self.forgiven.push(Grudge {
+            id: offender,
+            amount: 0.0,
+            last: now,
+        });
         if self.forgiven.len() > 6 {
             self.forgiven.remove(0);
         }
@@ -168,7 +193,11 @@ impl Emotion {
 
     /// Grudge held against a vehicle (0 = none).
     pub fn grudge_against(&self, id: VehicleId) -> f64 {
-        self.grudges.iter().rev().find(|g| g.id == id).map_or(0.0, |g| g.amount)
+        self.grudges
+            .iter()
+            .rev()
+            .find(|g| g.id == id)
+            .map_or(0.0, |g| g.amount)
     }
 
     fn pick_target(&mut self) {
@@ -185,7 +214,9 @@ impl Emotion {
     pub fn update(&mut self, dt: f64, now: f64, congestion: f64) {
         self.stress += (clamp(congestion, 0.0, 1.0) - self.stress) * (dt * 0.05).min(1.0);
         let since_offense = now - self.last_offense;
-        let decay = (0.6 + self.p.patience * 3.2) * (if since_offense > 6.0 { 1.6 } else { 0.6 }) * (1.0 - self.stress * 0.4);
+        let decay = (0.6 + self.p.patience * 3.2)
+            * (if since_offense > 6.0 { 1.6 } else { 0.6 })
+            * (1.0 - self.stress * 0.4);
         self.anger = (self.anger - decay * dt).max(0.0);
         for g in self.grudges.iter_mut() {
             g.amount -= decay * 0.8 * dt;

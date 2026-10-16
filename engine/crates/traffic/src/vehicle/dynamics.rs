@@ -26,7 +26,11 @@ pub struct Assists {
 
 impl Default for Assists {
     fn default() -> Self {
-        Assists { abs: true, tcs: true, esc: true }
+        Assists {
+            abs: true,
+            tcs: true,
+            esc: true,
+        }
     }
 }
 
@@ -187,15 +191,33 @@ impl VehicleDynamics {
 
     /// Advance by `dt` (sub-stepped). `drive_torque` comes from the powertrain,
     /// `steer_target` is the desired wheel angle (rad, + = left).
-    pub fn step(&mut self, dt: f64, inputs: &DriveInputs, drive_torque: f64, steer_target: f64, assists: &Assists) {
-        let sub = if dt > 1.0 / 90.0 { (dt / (1.0 / 120.0)).ceil() as usize } else { 1 };
+    pub fn step(
+        &mut self,
+        dt: f64,
+        inputs: &DriveInputs,
+        drive_torque: f64,
+        steer_target: f64,
+        assists: &Assists,
+    ) {
+        let sub = if dt > 1.0 / 90.0 {
+            (dt / (1.0 / 120.0)).ceil() as usize
+        } else {
+            1
+        };
         let h = dt / sub as f64;
         for _ in 0..sub {
             self.substep(h, inputs, drive_torque, steer_target, assists);
         }
     }
 
-    fn substep(&mut self, h: f64, inp: &DriveInputs, drive_torque: f64, steer_target: f64, assists: &Assists) {
+    fn substep(
+        &mut self,
+        h: f64,
+        inp: &DriveInputs,
+        drive_torque: f64,
+        steer_target: f64,
+        assists: &Assists,
+    ) {
         let spec = self.spec;
         let m = self.mass;
         let l = self.wheelbase;
@@ -205,7 +227,11 @@ impl VehicleDynamics {
 
         // Steering actuator (rate limited).
         let steer_rate = 3.2;
-        let ds = clamp(steer_target - self.steer_angle, -steer_rate * h, steer_rate * h);
+        let ds = clamp(
+            steer_target - self.steer_angle,
+            -steer_rate * h,
+            steer_rate * h,
+        );
         self.steer_angle += ds;
         let delta = self.steer_angle;
         let cd = delta.cos();
@@ -244,8 +270,34 @@ impl VehicleDynamics {
         let roll_f = spec.roll_resist * fz_f * (1.0 + self.surface_drag);
         let roll_r = spec.roll_resist * fz_r * (1.0 + self.surface_drag);
 
-        let res_f = self.axle(tq_f / rad, b_f, roll_f, long_f, lat_f, alpha_f, fz_f, mu, mu_k, assists, false, inp.handbrake);
-        let res_r = self.axle(tq_r / rad, b_r, roll_r, long_r, lat_r, alpha_r, fz_r, mu, mu_k, assists, true, inp.handbrake);
+        let res_f = self.axle(
+            tq_f / rad,
+            b_f,
+            roll_f,
+            long_f,
+            lat_f,
+            alpha_f,
+            fz_f,
+            mu,
+            mu_k,
+            assists,
+            false,
+            inp.handbrake,
+        );
+        let res_r = self.axle(
+            tq_r / rad,
+            b_r,
+            roll_r,
+            long_r,
+            lat_r,
+            alpha_r,
+            fz_r,
+            mu,
+            mu_k,
+            assists,
+            true,
+            inp.handbrake,
+        );
         self.front_locked = res_f.locked;
         self.rear_locked = res_r.locked;
         let spin = res_f.spin || res_r.spin;
@@ -287,7 +339,9 @@ impl VehicleDynamics {
         // Brakes and rolling resistance cannot push the car backwards.
         let drive_f = ((tq_f + tq_r) / rad).abs();
         let resist = b_f + b_r + roll_f + roll_r;
-        if ((u > 0.0 && u_n < 0.0) || (u < 0.0 && u_n > 0.0)) && (drive_f < resist || sign(drive_torque) == sign(u)) {
+        if ((u > 0.0 && u_n < 0.0) || (u < 0.0 && u_n > 0.0))
+            && (drive_f < resist || sign(drive_torque) == sign(u))
+        {
             u_n = 0.0;
         }
         if u_n.abs() < 0.05 && drive_f <= resist + 1.0 {
@@ -334,8 +388,26 @@ impl VehicleDynamics {
         let free_f = long_f / rad;
         let free_r = long_r / rad;
         let driven = spec.drive;
-        self.omega_f = if self.front_locked { 0.0 } else { free_f + if driven != DriveLayout::Rwd { (sgn * self.spin_slip) / rad } else { 0.0 } };
-        self.omega_r = if self.rear_locked { 0.0 } else { free_r + if driven != DriveLayout::Fwd { (sgn * self.spin_slip) / rad } else { 0.0 } };
+        self.omega_f = if self.front_locked {
+            0.0
+        } else {
+            free_f
+                + if driven != DriveLayout::Rwd {
+                    (sgn * self.spin_slip) / rad
+                } else {
+                    0.0
+                }
+        };
+        self.omega_r = if self.rear_locked {
+            0.0
+        } else {
+            free_r
+                + if driven != DriveLayout::Fwd {
+                    (sgn * self.spin_slip) / rad
+                } else {
+                    0.0
+                }
+        };
 
         // Skid intensity.
         let peak = 0.12;
@@ -411,16 +483,44 @@ impl VehicleDynamics {
         if locked {
             let sp = (v_long * v_long + v_lat * v_lat).sqrt();
             if sp > 0.01 {
-                return AxleForces { fx: (-mu_k * fz * v_long) / sp, fy: (-mu_k * fz * v_lat) / sp, locked, spin, abs, tcs };
+                return AxleForces {
+                    fx: (-mu_k * fz * v_long) / sp,
+                    fy: (-mu_k * fz * v_lat) / sp,
+                    locked,
+                    spin,
+                    abs,
+                    tcs,
+                };
             }
-            return AxleForces { fx: 0.0, fy: 0.0, locked, spin, abs, tcs };
+            return AxleForces {
+                fx: 0.0,
+                fy: 0.0,
+                locked,
+                spin,
+                abs,
+                tcs,
+            };
         }
         if spin {
             fx = sign(fx) * mu_k * fz;
             let fy_max = (f_max * f_max - fx * fx).max(0.0).sqrt() + f_max * 0.15;
-            return AxleForces { fx, fy: clamp(fy_pure * 0.55, -fy_max, fy_max), locked, spin, abs, tcs };
+            return AxleForces {
+                fx,
+                fy: clamp(fy_pure * 0.55, -fy_max, fy_max),
+                locked,
+                spin,
+                abs,
+                tcs,
+            };
         }
         let fy_max = (f_max * f_max - fx * fx).max(0.0).sqrt();
-        AxleForces { fx, fy: clamp(fy_pure, -fy_max, fy_max), locked, spin, abs, tcs }
+        AxleForces {
+            fx,
+            fy: clamp(fy_pure, -fy_max, fy_max),
+            locked,
+            spin,
+            abs,
+            tcs,
+        }
     }
 }

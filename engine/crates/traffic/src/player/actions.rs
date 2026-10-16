@@ -19,10 +19,48 @@ macro_rules! actions {
 }
 
 actions!(
-    Throttle, Brake, SteerLeft, SteerRight, Handbrake, Clutch, ShiftUp, ShiftDown, GearReverse, GearNeutral, TransmissionMode, Horn,
-    IndicatorLeft, IndicatorRight, Hazards, Headlights, HighBeam, Flash, Wipers, Siren, CruiseToggle, CruiseUp, CruiseDown, Limiter,
-    Engine, Seatbelt, ToggleAbs, ToggleTcs, ToggleEsc, Apologize, RudeGesture, Camera, LookBack, LookLeft, LookRight, ResetVehicle,
-    Pause, Help, Map, Debug, TimeForward, WeatherCycle,
+    Throttle,
+    Brake,
+    SteerLeft,
+    SteerRight,
+    Handbrake,
+    Clutch,
+    ShiftUp,
+    ShiftDown,
+    GearReverse,
+    GearNeutral,
+    TransmissionMode,
+    Horn,
+    IndicatorLeft,
+    IndicatorRight,
+    Hazards,
+    Headlights,
+    HighBeam,
+    Flash,
+    Wipers,
+    Siren,
+    CruiseToggle,
+    CruiseUp,
+    CruiseDown,
+    Limiter,
+    Engine,
+    Seatbelt,
+    ToggleAbs,
+    ToggleTcs,
+    ToggleEsc,
+    Apologize,
+    RudeGesture,
+    Camera,
+    LookBack,
+    LookLeft,
+    LookRight,
+    ResetVehicle,
+    Pause,
+    Help,
+    Map,
+    Debug,
+    TimeForward,
+    WeatherCycle,
 );
 
 /// Number of actions.
@@ -74,54 +112,450 @@ use ActionId as I;
 use ActionKind as K;
 use GamepadBinding::{Axis, Button};
 
-const fn a(id: ActionId, name: &'static str, label: &'static str, category: ActionCategory, kind: ActionKind, keys: &'static [&'static str], pad: &'static [GamepadBinding], help: &'static str) -> ActionDef {
-    ActionDef { id, name, label, category, kind, keys, pad, help }
+const fn a(
+    id: ActionId,
+    name: &'static str,
+    label: &'static str,
+    category: ActionCategory,
+    kind: ActionKind,
+    keys: &'static [&'static str],
+    pad: &'static [GamepadBinding],
+    help: &'static str,
+) -> ActionDef {
+    ActionDef {
+        id,
+        name,
+        label,
+        category,
+        kind,
+        keys,
+        pad,
+        help,
+    }
 }
 
 /// All actions (same order, labels, bindings and help as `player/actions.ts`).
 pub static ACTIONS: [ActionDef; ACTION_COUNT] = [
-    a(I::Throttle, "throttle", "Throttle", C::Driving, K::Analog, &["KeyW", "ArrowUp"], &[Button(7)], "Accelerate (in reverse with automatic: brake)."),
-    a(I::Brake, "brake", "Brake / reverse", C::Driving, K::Analog, &["KeyS", "ArrowDown"], &[Button(6)], "Brake. With automatic gearbox, hold at a standstill to reverse."),
-    a(I::SteerLeft, "steer_left", "Steer left", C::Driving, K::Analog, &["KeyA", "ArrowLeft"], &[Axis(0, -1)], "Steer left."),
-    a(I::SteerRight, "steer_right", "Steer right", C::Driving, K::Analog, &["KeyD", "ArrowRight"], &[Axis(0, 1)], "Steer right."),
-    a(I::Handbrake, "handbrake", "Handbrake", C::Driving, K::Hold, &["Space"], &[Button(0)], "Locks the rear wheels: parking, hairpins and drifts."),
-    a(I::Clutch, "clutch", "Clutch", C::Gearbox, K::Analog, &["KeyZ"], &[Button(4)], "Manual gearbox: press to shift or launch without stalling."),
-    a(I::ShiftUp, "shift_up", "Shift up", C::Gearbox, K::Press, &["ShiftLeft", "KeyR"], &[Button(1)], "Next gear (manual)."),
-    a(I::ShiftDown, "shift_down", "Shift down", C::Gearbox, K::Press, &["ControlLeft", "KeyF"], &[Button(2)], "Previous gear (manual)."),
-    a(I::GearReverse, "gear_reverse", "Select reverse", C::Gearbox, K::Press, &["Backspace"], &[], "Select R directly."),
-    a(I::GearNeutral, "gear_neutral", "Select neutral", C::Gearbox, K::Press, &["KeyN"], &[], "Select N directly."),
-    a(I::TransmissionMode, "transmission_mode", "Auto / manual", C::Gearbox, K::Press, &["KeyT"], &[], "Toggle automatic and manual transmission."),
-    a(I::Horn, "horn", "Horn", C::SignalsLights, K::Hold, &["KeyH"], &[Button(10)], "Tap for a beep, hold for a long blast (other drivers notice)."),
-    a(I::IndicatorLeft, "indicator_left", "Left indicator", C::SignalsLights, K::Press, &["KeyQ"], &[Button(14)], "Toggle left turn signal (auto-cancels after the turn)."),
-    a(I::IndicatorRight, "indicator_right", "Right indicator", C::SignalsLights, K::Press, &["KeyE"], &[Button(15)], "Toggle right turn signal (auto-cancels after the turn)."),
-    a(I::Hazards, "hazards", "Hazard lights", C::SignalsLights, K::Press, &["KeyX"], &[Button(13)], "All four indicators. A quick blink after merging says thanks."),
-    a(I::Headlights, "headlights", "Headlights", C::SignalsLights, K::Press, &["KeyL"], &[Button(12)], "Cycle the light switch: OFF, AUTO, ON."),
-    a(I::HighBeam, "high_beam", "High beam", C::SignalsLights, K::Press, &["KeyK"], &[], "Toggle high beams (dazzles oncoming drivers)."),
-    a(I::Flash, "flash", "Flash high beams", C::SignalsLights, K::Hold, &["KeyJ"], &[Button(5)], "Flash to pass / warn. Drivers ahead take it personally."),
-    a(I::Wipers, "wipers", "Wipers", C::SignalsLights, K::Press, &["KeyP"], &[], "Cycle wipers: OFF, INT, LOW, HIGH."),
-    a(I::Siren, "siren", "Siren", C::SignalsLights, K::Press, &["KeyO"], &[], "Emergency vehicles only: cycle siren."),
-    a(I::CruiseToggle, "cruise_toggle", "Cruise control", C::ComfortAssists, K::Press, &["KeyC"], &[], "Set / cancel cruise at the current speed. Brake also cancels."),
-    a(I::CruiseUp, "cruise_up", "Cruise +5", C::ComfortAssists, K::Press, &["Equal", "NumpadAdd"], &[], "Raise cruise speed by 5 km/h."),
-    a(I::CruiseDown, "cruise_down", "Cruise -5", C::ComfortAssists, K::Press, &["Minus", "NumpadSubtract"], &[], "Lower cruise speed by 5 km/h."),
-    a(I::Limiter, "limiter", "Speed limiter", C::ComfortAssists, K::Press, &["KeyU"], &[], "Cap speed at the posted limit."),
-    a(I::Engine, "engine", "Engine start / stop", C::ComfortAssists, K::Press, &["KeyI"], &[], "Turn the ignition. Needed after a stall."),
-    a(I::Seatbelt, "seatbelt", "Seatbelt", C::ComfortAssists, K::Press, &["KeyB"], &[], "Buckle up. Police fine unbelted drivers."),
-    a(I::ToggleAbs, "toggle_abs", "ABS on/off", C::ComfortAssists, K::Press, &["Digit1"], &[], "Anti-lock brakes."),
-    a(I::ToggleTcs, "toggle_tcs", "Traction control on/off", C::ComfortAssists, K::Press, &["Digit2"], &[], "Traction control (off = burnouts)."),
-    a(I::ToggleEsc, "toggle_esc", "Stability control on/off", C::ComfortAssists, K::Press, &["Digit3"], &[], "Electronic stability control."),
-    a(I::Apologize, "apologize", "Wave / sorry", C::Social, K::Press, &["KeyG"], &[Button(3)], "Apologise to nearby drivers. Calms people you just upset."),
-    a(I::RudeGesture, "rude_gesture", "Rude gesture", C::Social, K::Press, &["KeyY"], &[], "Insult nearby drivers. Expect consequences."),
-    a(I::Camera, "camera", "Change camera", C::Camera, K::Press, &["KeyV"], &[Button(8)], "Chase, far chase, hood, cockpit, top-down, cinematic."),
-    a(I::LookBack, "look_back", "Look back", C::Camera, K::Hold, &["KeyM"], &[Button(11)], "Hold to look behind."),
-    a(I::LookLeft, "look_left", "Look left", C::Camera, K::Hold, &["Comma"], &[], "Hold to look left."),
-    a(I::LookRight, "look_right", "Look right", C::Camera, K::Hold, &["Period"], &[], "Hold to look right."),
-    a(I::ResetVehicle, "reset_vehicle", "Reset vehicle", C::System, K::Press, &["Backquote"], &[], "Put the car back on the nearest road (repair costs money)."),
-    a(I::Pause, "pause", "Pause / menu", C::System, K::Press, &["Escape"], &[Button(9)], "Pause and open the menu."),
-    a(I::Help, "help", "Controls help", C::System, K::Press, &["F1"], &[], "Show all controls."),
-    a(I::Map, "map", "Map", C::System, K::Press, &["Tab"], &[], "Toggle the big map."),
-    a(I::Debug, "debug", "Debug overlay", C::System, K::Press, &["F3"], &[], "Show AI moods, intentions and signal phases."),
-    a(I::TimeForward, "time_forward", "Skip time", C::System, K::Press, &["BracketRight"], &[], "Advance the clock by one hour."),
-    a(I::WeatherCycle, "weather_cycle", "Change weather", C::System, K::Press, &["BracketLeft"], &[], "Cycle clear, rain, storm, fog."),
+    a(
+        I::Throttle,
+        "throttle",
+        "Throttle",
+        C::Driving,
+        K::Analog,
+        &["KeyW", "ArrowUp"],
+        &[Button(7)],
+        "Accelerate (in reverse with automatic: brake).",
+    ),
+    a(
+        I::Brake,
+        "brake",
+        "Brake / reverse",
+        C::Driving,
+        K::Analog,
+        &["KeyS", "ArrowDown"],
+        &[Button(6)],
+        "Brake. With automatic gearbox, hold at a standstill to reverse.",
+    ),
+    a(
+        I::SteerLeft,
+        "steer_left",
+        "Steer left",
+        C::Driving,
+        K::Analog,
+        &["KeyA", "ArrowLeft"],
+        &[Axis(0, -1)],
+        "Steer left.",
+    ),
+    a(
+        I::SteerRight,
+        "steer_right",
+        "Steer right",
+        C::Driving,
+        K::Analog,
+        &["KeyD", "ArrowRight"],
+        &[Axis(0, 1)],
+        "Steer right.",
+    ),
+    a(
+        I::Handbrake,
+        "handbrake",
+        "Handbrake",
+        C::Driving,
+        K::Hold,
+        &["Space"],
+        &[Button(0)],
+        "Locks the rear wheels: parking, hairpins and drifts.",
+    ),
+    a(
+        I::Clutch,
+        "clutch",
+        "Clutch",
+        C::Gearbox,
+        K::Analog,
+        &["KeyZ"],
+        &[Button(4)],
+        "Manual gearbox: press to shift or launch without stalling.",
+    ),
+    a(
+        I::ShiftUp,
+        "shift_up",
+        "Shift up",
+        C::Gearbox,
+        K::Press,
+        &["ShiftLeft", "KeyR"],
+        &[Button(1)],
+        "Next gear (manual).",
+    ),
+    a(
+        I::ShiftDown,
+        "shift_down",
+        "Shift down",
+        C::Gearbox,
+        K::Press,
+        &["ControlLeft", "KeyF"],
+        &[Button(2)],
+        "Previous gear (manual).",
+    ),
+    a(
+        I::GearReverse,
+        "gear_reverse",
+        "Select reverse",
+        C::Gearbox,
+        K::Press,
+        &["Backspace"],
+        &[],
+        "Select R directly.",
+    ),
+    a(
+        I::GearNeutral,
+        "gear_neutral",
+        "Select neutral",
+        C::Gearbox,
+        K::Press,
+        &["KeyN"],
+        &[],
+        "Select N directly.",
+    ),
+    a(
+        I::TransmissionMode,
+        "transmission_mode",
+        "Auto / manual",
+        C::Gearbox,
+        K::Press,
+        &["KeyT"],
+        &[],
+        "Toggle automatic and manual transmission.",
+    ),
+    a(
+        I::Horn,
+        "horn",
+        "Horn",
+        C::SignalsLights,
+        K::Hold,
+        &["KeyH"],
+        &[Button(10)],
+        "Tap for a beep, hold for a long blast (other drivers notice).",
+    ),
+    a(
+        I::IndicatorLeft,
+        "indicator_left",
+        "Left indicator",
+        C::SignalsLights,
+        K::Press,
+        &["KeyQ"],
+        &[Button(14)],
+        "Toggle left turn signal (auto-cancels after the turn).",
+    ),
+    a(
+        I::IndicatorRight,
+        "indicator_right",
+        "Right indicator",
+        C::SignalsLights,
+        K::Press,
+        &["KeyE"],
+        &[Button(15)],
+        "Toggle right turn signal (auto-cancels after the turn).",
+    ),
+    a(
+        I::Hazards,
+        "hazards",
+        "Hazard lights",
+        C::SignalsLights,
+        K::Press,
+        &["KeyX"],
+        &[Button(13)],
+        "All four indicators. A quick blink after merging says thanks.",
+    ),
+    a(
+        I::Headlights,
+        "headlights",
+        "Headlights",
+        C::SignalsLights,
+        K::Press,
+        &["KeyL"],
+        &[Button(12)],
+        "Cycle the light switch: OFF, AUTO, ON.",
+    ),
+    a(
+        I::HighBeam,
+        "high_beam",
+        "High beam",
+        C::SignalsLights,
+        K::Press,
+        &["KeyK"],
+        &[],
+        "Toggle high beams (dazzles oncoming drivers).",
+    ),
+    a(
+        I::Flash,
+        "flash",
+        "Flash high beams",
+        C::SignalsLights,
+        K::Hold,
+        &["KeyJ"],
+        &[Button(5)],
+        "Flash to pass / warn. Drivers ahead take it personally.",
+    ),
+    a(
+        I::Wipers,
+        "wipers",
+        "Wipers",
+        C::SignalsLights,
+        K::Press,
+        &["KeyP"],
+        &[],
+        "Cycle wipers: OFF, INT, LOW, HIGH.",
+    ),
+    a(
+        I::Siren,
+        "siren",
+        "Siren",
+        C::SignalsLights,
+        K::Press,
+        &["KeyO"],
+        &[],
+        "Emergency vehicles only: cycle siren.",
+    ),
+    a(
+        I::CruiseToggle,
+        "cruise_toggle",
+        "Cruise control",
+        C::ComfortAssists,
+        K::Press,
+        &["KeyC"],
+        &[],
+        "Set / cancel cruise at the current speed. Brake also cancels.",
+    ),
+    a(
+        I::CruiseUp,
+        "cruise_up",
+        "Cruise +5",
+        C::ComfortAssists,
+        K::Press,
+        &["Equal", "NumpadAdd"],
+        &[],
+        "Raise cruise speed by 5 km/h.",
+    ),
+    a(
+        I::CruiseDown,
+        "cruise_down",
+        "Cruise -5",
+        C::ComfortAssists,
+        K::Press,
+        &["Minus", "NumpadSubtract"],
+        &[],
+        "Lower cruise speed by 5 km/h.",
+    ),
+    a(
+        I::Limiter,
+        "limiter",
+        "Speed limiter",
+        C::ComfortAssists,
+        K::Press,
+        &["KeyU"],
+        &[],
+        "Cap speed at the posted limit.",
+    ),
+    a(
+        I::Engine,
+        "engine",
+        "Engine start / stop",
+        C::ComfortAssists,
+        K::Press,
+        &["KeyI"],
+        &[],
+        "Turn the ignition. Needed after a stall.",
+    ),
+    a(
+        I::Seatbelt,
+        "seatbelt",
+        "Seatbelt",
+        C::ComfortAssists,
+        K::Press,
+        &["KeyB"],
+        &[],
+        "Buckle up. Police fine unbelted drivers.",
+    ),
+    a(
+        I::ToggleAbs,
+        "toggle_abs",
+        "ABS on/off",
+        C::ComfortAssists,
+        K::Press,
+        &["Digit1"],
+        &[],
+        "Anti-lock brakes.",
+    ),
+    a(
+        I::ToggleTcs,
+        "toggle_tcs",
+        "Traction control on/off",
+        C::ComfortAssists,
+        K::Press,
+        &["Digit2"],
+        &[],
+        "Traction control (off = burnouts).",
+    ),
+    a(
+        I::ToggleEsc,
+        "toggle_esc",
+        "Stability control on/off",
+        C::ComfortAssists,
+        K::Press,
+        &["Digit3"],
+        &[],
+        "Electronic stability control.",
+    ),
+    a(
+        I::Apologize,
+        "apologize",
+        "Wave / sorry",
+        C::Social,
+        K::Press,
+        &["KeyG"],
+        &[Button(3)],
+        "Apologise to nearby drivers. Calms people you just upset.",
+    ),
+    a(
+        I::RudeGesture,
+        "rude_gesture",
+        "Rude gesture",
+        C::Social,
+        K::Press,
+        &["KeyY"],
+        &[],
+        "Insult nearby drivers. Expect consequences.",
+    ),
+    a(
+        I::Camera,
+        "camera",
+        "Change camera",
+        C::Camera,
+        K::Press,
+        &["KeyV"],
+        &[Button(8)],
+        "Chase, far chase, hood, cockpit, top-down, cinematic.",
+    ),
+    a(
+        I::LookBack,
+        "look_back",
+        "Look back",
+        C::Camera,
+        K::Hold,
+        &["KeyM"],
+        &[Button(11)],
+        "Hold to look behind.",
+    ),
+    a(
+        I::LookLeft,
+        "look_left",
+        "Look left",
+        C::Camera,
+        K::Hold,
+        &["Comma"],
+        &[],
+        "Hold to look left.",
+    ),
+    a(
+        I::LookRight,
+        "look_right",
+        "Look right",
+        C::Camera,
+        K::Hold,
+        &["Period"],
+        &[],
+        "Hold to look right.",
+    ),
+    a(
+        I::ResetVehicle,
+        "reset_vehicle",
+        "Reset vehicle",
+        C::System,
+        K::Press,
+        &["Backquote"],
+        &[],
+        "Put the car back on the nearest road (repair costs money).",
+    ),
+    a(
+        I::Pause,
+        "pause",
+        "Pause / menu",
+        C::System,
+        K::Press,
+        &["Escape"],
+        &[Button(9)],
+        "Pause and open the menu.",
+    ),
+    a(
+        I::Help,
+        "help",
+        "Controls help",
+        C::System,
+        K::Press,
+        &["F1"],
+        &[],
+        "Show all controls.",
+    ),
+    a(
+        I::Map,
+        "map",
+        "Map",
+        C::System,
+        K::Press,
+        &["Tab"],
+        &[],
+        "Toggle the big map.",
+    ),
+    a(
+        I::Debug,
+        "debug",
+        "Debug overlay",
+        C::System,
+        K::Press,
+        &["F3"],
+        &[],
+        "Show AI moods, intentions and signal phases.",
+    ),
+    a(
+        I::TimeForward,
+        "time_forward",
+        "Skip time",
+        C::System,
+        K::Press,
+        &["BracketRight"],
+        &[],
+        "Advance the clock by one hour.",
+    ),
+    a(
+        I::WeatherCycle,
+        "weather_cycle",
+        "Change weather",
+        C::System,
+        K::Press,
+        &["BracketLeft"],
+        &[],
+        "Cycle clear, rain, storm, fog.",
+    ),
 ];
 
 /// Definition of an action.
@@ -191,7 +625,13 @@ fn ramp(cur: f64, target: f64, max_delta: f64) -> f64 {
 
 impl InputMapper {
     pub fn new() -> Self {
-        let bindings = ACTIONS.iter().map(|d| Binding { keys: d.keys.iter().map(|k| k.to_string()).collect(), pad: d.pad.to_vec() }).collect();
+        let bindings = ACTIONS
+            .iter()
+            .map(|d| Binding {
+                keys: d.keys.iter().map(|k| k.to_string()).collect(),
+                pad: d.pad.to_vec(),
+            })
+            .collect();
         let mut m = InputMapper {
             raw: [0.0; ACTION_COUNT],
             prev: [0.0; ACTION_COUNT],
@@ -221,7 +661,10 @@ impl InputMapper {
         self.key_index.clear();
         for (i, b) in self.bindings.iter().enumerate() {
             for k in &b.keys {
-                self.key_index.entry(k.clone()).or_default().push(ActionId::ALL[i]);
+                self.key_index
+                    .entry(k.clone())
+                    .or_default()
+                    .push(ActionId::ALL[i]);
             }
         }
     }
@@ -243,7 +686,9 @@ impl InputMapper {
     pub fn key(&mut self, code: &str, down: bool) -> bool {
         let was = self.keys_down.get(code).copied().unwrap_or(false);
         self.keys_down.insert(code.to_string(), down);
-        let Some(ids) = self.key_index.get(code) else { return false };
+        let Some(ids) = self.key_index.get(code) else {
+            return false;
+        };
         if down && !was {
             self.pending_press.extend(ids.iter().copied());
         }
@@ -307,7 +752,11 @@ impl InputMapper {
 
     fn value(&self, i: usize) -> f64 {
         let mut v = self.direct[i].max(self.pad_values[i]);
-        if self.bindings[i].keys.iter().any(|k| self.keys_down.get(k).copied().unwrap_or(false)) {
+        if self.bindings[i]
+            .keys
+            .iter()
+            .any(|k| self.keys_down.get(k).copied().unwrap_or(false))
+        {
             v = 1.0;
         }
         v
@@ -343,15 +792,40 @@ impl InputMapper {
             self.s_steer += (steer - self.s_steer) * (dt * 20.0).min(1.0);
             self.s_clutch = clutch;
         } else {
-            self.s_throttle = ramp(self.s_throttle, thr, dt * if thr > self.s_throttle { 4.0 } else { 8.0 });
-            self.s_brake = ramp(self.s_brake, brk, dt * if brk > self.s_brake { 5.0 } else { 10.0 });
+            self.s_throttle = ramp(
+                self.s_throttle,
+                thr,
+                dt * if thr > self.s_throttle { 4.0 } else { 8.0 },
+            );
+            self.s_brake = ramp(
+                self.s_brake,
+                brk,
+                dt * if brk > self.s_brake { 5.0 } else { 10.0 },
+            );
             self.s_clutch = ramp(self.s_clutch, clutch, dt * 6.0);
             let speed_factor = 1.0 / (1.0 + speed.abs() / 18.0);
             let target = steer * (0.35 + 0.65 * speed_factor);
             let returning = target.abs() < self.s_steer.abs() || target * self.s_steer < 0.0;
-            self.s_steer = ramp(self.s_steer, target, dt * if returning { 5.0 } else { 2.2 + 1.8 * speed_factor });
+            self.s_steer = ramp(
+                self.s_steer,
+                target,
+                dt * if returning {
+                    5.0
+                } else {
+                    2.2 + 1.8 * speed_factor
+                },
+            );
         }
-        ControlFrame { throttle: self.s_throttle, brake: self.s_brake, steer: self.s_steer, handbrake, clutch: self.s_clutch, pressed, released, held }
+        ControlFrame {
+            throttle: self.s_throttle,
+            brake: self.s_brake,
+            steer: self.s_steer,
+            handbrake,
+            clutch: self.s_clutch,
+            pressed,
+            released,
+            held,
+        }
     }
 
     pub fn is_held(&self, id: ActionId) -> bool {

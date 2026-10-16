@@ -238,7 +238,10 @@ impl Sim {
         if self.occ.lane(lane).iter().any(|e| (e.s - s).abs() < clear) {
             return false;
         }
-        !self.vehicles.iter().any(|v| v.seg == Some(SegRef::Lane(lane)) && (v.s - s).abs() < clear)
+        !self
+            .vehicles
+            .iter()
+            .any(|v| v.seg == Some(SegRef::Lane(lane)) && (v.s - s).abs() < clear)
     }
 
     #[inline]
@@ -251,7 +254,11 @@ impl Sim {
     /// Run `f` with the driver of the vehicle at index `vi` taken out of its
     /// vehicle (so it can use the whole `Sim`). Returns None if there is no
     /// driver (player, or a driver already in use further up the stack).
-    pub fn with_driver<R>(&mut self, vi: usize, f: impl FnOnce(&mut AIDriver, &mut Sim) -> R) -> Option<R> {
+    pub fn with_driver<R>(
+        &mut self,
+        vi: usize,
+        f: impl FnOnce(&mut AIDriver, &mut Sim) -> R,
+    ) -> Option<R> {
         let mut d = self.vehicles[vi].driver.take()?;
         let r = f(&mut d, self);
         self.vehicles[vi].driver = Some(d);
@@ -260,7 +267,13 @@ impl Sim {
 
     /// Route an offense to the victim's emotions; non-continuous offenses
     /// emit an `Offense` event and trigger the victim's reaction.
-    pub fn offend(&mut self, offender: VehicleId, victim: VehicleId, kind: OffenseKind, scale: f64) {
+    pub fn offend(
+        &mut self,
+        offender: VehicleId,
+        victim: VehicleId,
+        kind: OffenseKind,
+        scale: f64,
+    ) {
         if offender == victim {
             return;
         }
@@ -276,7 +289,12 @@ impl Sim {
         self.offend_depth += 1;
         let gain = d.emo.offend(Some(offender), kind, scale, self.time);
         if !kind.is_continuous() && gain > 0.5 {
-            self.events.emit(Event::Offense { offender, victim, kind, anger: d.emo.anger });
+            self.events.emit(Event::Offense {
+                offender,
+                victim,
+                kind,
+                anger: d.emo.anger,
+            });
             d.on_offended(self, vi, offender, kind);
         }
         self.vehicles[vi].driver = Some(d);
@@ -319,7 +337,9 @@ impl Sim {
 
     /// Anger vehicles in front of a honking car.
     pub fn horn_victims(&mut self, honker: VehicleId, long: bool) {
-        let Some(h) = self.vehicle(honker) else { return };
+        let Some(h) = self.vehicle(honker) else {
+            return;
+        };
         let (hx, hy) = (h.x, h.y);
         let hc = h.heading.cos();
         let hs = h.heading.sin();
@@ -341,7 +361,11 @@ impl Sim {
             })
             .map(|o| o.id)
             .collect();
-        let kind = if long { OffenseKind::LongHonk } else { OffenseKind::HonkedAt };
+        let kind = if long {
+            OffenseKind::LongHonk
+        } else {
+            OffenseKind::HonkedAt
+        };
         for o in victims {
             self.offend(honker, o, kind, 1.0);
         }
@@ -411,12 +435,14 @@ impl Sim {
                 width: v.width,
                 intent: v.intent_connector,
             };
-            if v.mode == MotionMode::Lane && v.seg.is_some() {
-                let seg = v.seg.unwrap();
+            if let (MotionMode::Lane, Some(seg)) = (v.mode, v.seg) {
                 self.occ.add(seg, entry(v.s, v.speed, false, v.lat));
                 if let Some(prev) = v.prev_seg {
                     if v.s < v.half_len + 0.5 {
-                        self.occ.add(prev, entry(self.net.seg_length(prev) + v.s, v.speed, false, v.lat));
+                        self.occ.add(
+                            prev,
+                            entry(self.net.seg_length(prev) + v.s, v.speed, false, v.lat),
+                        );
                     }
                 }
                 if let (Some(d), SegRef::Lane(cur)) = (v.driver(), seg) {
@@ -424,15 +450,21 @@ impl Sim {
                     if let Some(opp) = d.passing {
                         if v.lat.abs() > 1.2 {
                             let ol = self.net.lane(opp).length;
-                            self.occ.add(SegRef::Lane(opp), entry(ol - v.s, -v.speed, true, 0.0));
+                            self.occ
+                                .add(SegRef::Lane(opp), entry(ol - v.s, -v.speed, true, 0.0));
                         }
                     }
                     if let Some(sh) = d.shadow_lane {
                         let shl = self.net.lane(sh);
                         let cl = self.net.lane(cur);
                         let s_s = (v.s * shl.length) / cl.length;
-                        let offset = if v.lat > 0.0 { v.lat - (shl.width + cl.width) / 2.0 } else { v.lat + (shl.width + cl.width) / 2.0 };
-                        self.occ.add(SegRef::Lane(sh), entry(s_s, v.speed, true, offset));
+                        let offset = if v.lat > 0.0 {
+                            v.lat - (shl.width + cl.width) / 2.0
+                        } else {
+                            v.lat + (shl.width + cl.width) / 2.0
+                        };
+                        self.occ
+                            .add(SegRef::Lane(sh), entry(s_s, v.speed, true, offset));
                     }
                 }
             } else {
