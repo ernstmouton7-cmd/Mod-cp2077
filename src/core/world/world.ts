@@ -40,6 +40,22 @@ export interface WorldOptions {
   noPlayer?: boolean;
 }
 
+/** The player's session statistics (driver report). */
+export interface PlayerStats {
+  distance: number;
+  driveTime: number;
+  maxSpeed: number;
+  collisions: number;
+  nearMisses: number;
+  /** Drivers the player made at least irritated. */
+  angered: number;
+  apologiesAccepted: number;
+  rageEpisodes: number;
+  honks: number;
+  pedestriansHit: number;
+  redLightsRun: number;
+}
+
 export interface WorldStats {
   collisions: number;
   rageEpisodes: number;
@@ -75,6 +91,8 @@ export class World implements SimContext {
   readonly police = new PoliceSystem();
   readonly spawner: Spawner;
   readonly stats: WorldStats = { collisions: 0, rageEpisodes: 0, horns: 0, redLightRunners: 0, spawned: 0 };
+  readonly playerStats: PlayerStats = { distance: 0, driveTime: 0, maxSpeed: 0, collisions: 0, nearMisses: 0, angered: 0, apologiesAccepted: 0, rageEpisodes: 0, honks: 0, pedestriansHit: 0, redLightsRun: 0 };
+  private angeredIds: Map<number, boolean> = new Map();
   readonly fixedDt: number;
   /** Simulation speed multiplier (pause = 0). */
   timeScale = 1;
@@ -157,6 +175,7 @@ export class World implements SimContext {
     };
     // Initial lane occupancy for the first frame.
     this.rebuildOccupancy();
+    this.events.onAny((e) => this.trackPlayer(e));
   }
 
   // ----------------------------------------------------------- setup
@@ -278,6 +297,22 @@ export class World implements SimContext {
       if (v.seg === lane && Math.abs(v.s - s) < clear) return false;
     }
     return true;
+  }
+
+  private trackPlayer(e: SimEvent): void {
+    const p = this.player;
+    if (p === undefined) return;
+    const st = this.playerStats;
+    if (e.type === "collision" && (e.a === p.id || e.b === p.id) && e.severity > 0.8) st.collisions++;
+    else if (e.type === "near_miss" && e.a === p.id) st.nearMisses++;
+    else if (e.type === "offense" && e.offender === p.id && e.anger > 22 && this.angeredIds.get(e.victim) !== true) {
+      this.angeredIds.set(e.victim, true);
+      st.angered++;
+    } else if (e.type === "apology" && e.calmed > 5) st.apologiesAccepted++;
+    else if (e.type === "rage_start" && e.target === p.id) st.rageEpisodes++;
+    else if (e.type === "horn" && e.vehicle === p.id && !e.long) st.honks++;
+    else if (e.type === "ped_hit" && e.vehicle === p.id) st.pedestriansHit++;
+    else if (e.type === "violation" && e.kind === "red_light") st.redLightsRun++;
   }
 
   // ----------------------------------------------------------- SimContext
@@ -609,6 +644,10 @@ export class World implements SimContext {
       v.wheelSpin += dyn.drivenOmega() * dt;
       v.odometer += dyn.absSpeed() * dt;
       if (isPlayer) {
+        const sp = dyn.absSpeed();
+        this.playerStats.distance += sp * dt;
+        if (sp > 0.5) this.playerStats.driveTime += dt;
+        if (sp > this.playerStats.maxSpeed) this.playerStats.maxSpeed = sp;
         v.lights.update(dt, dyn.steerAngle);
         if (dyn.absSpeed() > 0.5) this.record.driveClean(dyn.absSpeed() * dt);
       }

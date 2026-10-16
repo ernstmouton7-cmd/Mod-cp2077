@@ -159,7 +159,7 @@ body:has(.title:not([hidden])) .touch { display: none; }
 .facts b { font-family: var(--font-mono); color: var(--sodium); display: inline-block; min-width: 2.2em; }
 .title-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .title button, .menu button.primary { cursor: pointer; border-radius: 4px; padding: 10px 18px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.85rem; border: 1px solid var(--line); background: transparent; }
-.title button.primary, .menu .primary { background: var(--sodium); color: var(--sign-black); border-color: var(--sodium); }
+.title button.primary, .menu button.primary { background: var(--sodium); color: var(--sign-black); border-color: var(--sodium); }
 .keys { margin: 0; font-size: 0.8rem; color: var(--muted); line-height: 2; }
 
 /* Menu */
@@ -188,6 +188,15 @@ body:has(.title:not([hidden])) .touch { display: none; }
 .settings label.check { display: flex; align-items: center; gap: 8px; color: var(--ink); }
 .settings select, .settings input[type="range"] { width: 100%; }
 .settings select { background: var(--panel-solid); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 6px; }
+.report-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); gap: 8px; }
+.tile { background: var(--panel-solid); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; display: grid; gap: 2px; }
+.tile b { font-size: 1.15rem; }
+.report-h { margin: 8px 0 0; font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--sodium); }
+.table-wrap { overflow-x: auto; }
+.report-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+.report-table th, .report-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.report-table th { font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.report-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .about-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 16px 24px; }
 .about h3 { margin: 0 0 4px; font-family: var(--font-display); font-size: 1.3rem; text-transform: uppercase; color: var(--sodium); }
 .about p { margin: 0; font-size: 0.86rem; line-height: 1.55; color: var(--ink); }

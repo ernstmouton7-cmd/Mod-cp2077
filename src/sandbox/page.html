@@ -114,6 +114,7 @@
         <nav class="tabs" role="tablist">
           <button type="button" role="tab" data-tab="controls" aria-selected="true">Controls</button>
           <button type="button" role="tab" data-tab="settings" aria-selected="false">Settings</button>
+          <button type="button" role="tab" data-tab="report" aria-selected="false">Driver report</button>
           <button type="button" role="tab" data-tab="about" aria-selected="false">How it works</button>
         </nav>
         <button id="resume" class="primary" type="button">Resume</button>
@@ -143,6 +144,9 @@
           <label class="check" for="setBloom"><input type="checkbox" id="setBloom"> Neon bloom</label>
           <label for="setQuality">Quality (reload to apply)<select id="setQuality"><option value="high">High</option><option value="low">Low</option></select></label>
         </div>
+      </div>
+      <div data-panel="report" class="panel-body" hidden>
+        <div id="report"></div>
       </div>
       <div data-panel="about" class="panel-body about" hidden>
         <div class="about-grid">

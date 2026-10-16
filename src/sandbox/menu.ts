@@ -81,7 +81,45 @@ export class Menu {
     (document.getElementById("menu") as HTMLElement).hidden = true;
   }
 
+  /** Session statistics and the violation history. */
+  renderReport(unit: "kmh" | "mph"): void {
+    const w = this.world;
+    const st = w.playerStats;
+    const rec = w.record;
+    const sp = (ms: number) => (unit === "kmh" ? `${Math.round(ms * 3.6)} km/h` : `${Math.round(ms * 2.23694)} mph`);
+    const dist = unit === "kmh" ? `${(st.distance / 1000).toFixed(1)} km` : `${(st.distance / 1609.34).toFixed(1)} mi`;
+    const mins = Math.floor(st.driveTime / 60);
+    const tiles: [string, string][] = [
+      ["Distance", dist],
+      ["Time moving", `${mins} min`],
+      ["Top speed", sp(st.maxSpeed)],
+      ["Fines paid", `€$${Math.round(rec.totalFines).toLocaleString("en-US")}`],
+      ["License points", `${rec.points}/${rec.maxPoints}`],
+      ["Tickets", `${rec.ticketsIssued}`],
+      ["Collisions", `${st.collisions}`],
+      ["Near misses", `${st.nearMisses}`],
+      ["Drivers you angered", `${st.angered}`],
+      ["Apologies accepted", `${st.apologiesAccepted}`],
+      ["Road-rage episodes", `${st.rageEpisodes}`],
+      ["Pedestrians hit", `${st.pedestriansHit}`],
+    ];
+    const rows = rec.history
+      .slice(-14)
+      .reverse()
+      .map((v) => {
+        const t = Math.floor(v.time / 60);
+        const witness = v.witness === "none" ? "Unseen" : v.witness === "camera" ? "Camera" : "Police";
+        return `<tr><td class="mono">${t} min</td><td>${v.label}</td><td>${witness}</td><td class="mono num">${v.witness === "none" ? "—" : `€$${v.fine}`}</td><td class="mono num">${v.witness === "none" ? "—" : v.points}</td></tr>`;
+      })
+      .join("");
+    const box = document.getElementById("report") as HTMLElement;
+    box.innerHTML = `<div class="report-tiles">${tiles.map(([k, v]) => `<div class="tile"><span class="panel-label">${k}</span><b class="mono">${v}</b></div>`).join("")}</div>
+      <h3 class="report-h">Violations</h3>
+      ${rows === "" ? `<p class="muted">A clean record so far. Every red light, rolling stop and unsignalled turn will show up here, seen or not.</p>` : `<div class="table-wrap"><table class="report-table"><thead><tr><th>When</th><th>Violation</th><th>Seen by</th><th class="num">Fine</th><th class="num">Points</th></tr></thead><tbody>${rows}</tbody></table></div>`}`;
+  }
+
   tab(name: string): void {
+    if (name === "report") this.renderReport(this.settings.unit);
     document.querySelectorAll<HTMLElement>("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== name));
     document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === name ? "true" : "false"));
   }
