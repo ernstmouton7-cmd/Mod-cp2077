@@ -51,7 +51,14 @@ fn rank(s: &Shape) -> u8 {
 }
 
 /// Generate contact manifolds between two posed shapes. Appends to `out`.
-pub fn collide(sa: &Shape, pa: &Pose, sb: &Shape, pb: &Pose, margin: f32, out: &mut Vec<ManifoldGeom>) {
+pub fn collide(
+    sa: &Shape,
+    pa: &Pose,
+    sb: &Shape,
+    pb: &Pose,
+    margin: f32,
+    out: &mut Vec<ManifoldGeom>,
+) {
     if rank(sa) > rank(sb) {
         let start = out.len();
         collide_ordered(sb, pb, sa, pa, margin, out);
@@ -64,24 +71,49 @@ pub fn collide(sa: &Shape, pa: &Pose, sb: &Shape, pb: &Pose, margin: f32, out: &
 }
 
 fn capsule_segment(hh: f32, pose: &Pose) -> (Vec3, Vec3) {
-    (pose.transform_point(Vec3::new(0.0, -hh, 0.0)), pose.transform_point(Vec3::new(0.0, hh, 0.0)))
+    (
+        pose.transform_point(Vec3::new(0.0, -hh, 0.0)),
+        pose.transform_point(Vec3::new(0.0, hh, 0.0)),
+    )
 }
 
-fn collide_ordered(sa: &Shape, pa: &Pose, sb: &Shape, pb: &Pose, margin: f32, out: &mut Vec<ManifoldGeom>) {
+fn collide_ordered(
+    sa: &Shape,
+    pa: &Pose,
+    sb: &Shape,
+    pb: &Pose,
+    margin: f32,
+    out: &mut Vec<ManifoldGeom>,
+) {
     match (sa, sb) {
         (Shape::Sphere { radius: ra }, Shape::Sphere { radius: rb }) => {
             if let Some(m) = sphere_sphere(pa.p, *ra, pb.p, *rb, margin) {
                 out.push(m);
             }
         }
-        (Shape::Sphere { radius: ra }, Shape::Capsule { half_height, radius: rb }) => {
+        (
+            Shape::Sphere { radius: ra },
+            Shape::Capsule {
+                half_height,
+                radius: rb,
+            },
+        ) => {
             let (s0, s1) = capsule_segment(*half_height, pb);
             let (c, _) = closest_point_segment(pa.p, s0, s1);
             if let Some(m) = sphere_sphere(pa.p, *ra, c, *rb, margin) {
                 out.push(m);
             }
         }
-        (Shape::Capsule { half_height: ha, radius: ra }, Shape::Capsule { half_height: hb, radius: rb }) => {
+        (
+            Shape::Capsule {
+                half_height: ha,
+                radius: ra,
+            },
+            Shape::Capsule {
+                half_height: hb,
+                radius: rb,
+            },
+        ) => {
             let (a0, a1) = capsule_segment(*ha, pa);
             let (b0, b1) = capsule_segment(*hb, pb);
             if let Some(m) = capsule_capsule(a0, a1, *ra, b0, b1, *rb, margin) {
@@ -94,7 +126,13 @@ fn collide_ordered(sa: &Shape, pa: &Pose, sb: &Shape, pb: &Pose, margin: f32, ou
                 out.push(m);
             }
         }
-        (Shape::Capsule { half_height, radius }, _) if sb.hull().is_some() => {
+        (
+            Shape::Capsule {
+                half_height,
+                radius,
+            },
+            _,
+        ) if sb.hull().is_some() => {
             let (a0, a1) = capsule_segment(*half_height, pa);
             let poly = WorldPoly::from_hull(sb.hull().unwrap(), pb);
             if let Some(m) = core_poly(&[a0, a1], *radius, &poly, margin) {
@@ -121,12 +159,27 @@ fn sphere_sphere(ca: Vec3, ra: f32, cb: Vec3, rb: f32, margin: f32) -> Option<Ma
         return None;
     }
     let n = if dist > 1e-6 { d / dist } else { Vec3::Y };
-    let mut m = ManifoldGeom { normal: n, ..Default::default() };
-    m.points.push(PointGeom { pa: ca + n * ra, pb: cb - n * rb, separation: sep });
+    let mut m = ManifoldGeom {
+        normal: n,
+        ..Default::default()
+    };
+    m.points.push(PointGeom {
+        pa: ca + n * ra,
+        pb: cb - n * rb,
+        separation: sep,
+    });
     Some(m)
 }
 
-fn capsule_capsule(a0: Vec3, a1: Vec3, ra: f32, b0: Vec3, b1: Vec3, rb: f32, margin: f32) -> Option<ManifoldGeom> {
+fn capsule_capsule(
+    a0: Vec3,
+    a1: Vec3,
+    ra: f32,
+    b0: Vec3,
+    b1: Vec3,
+    rb: f32,
+    margin: f32,
+) -> Option<ManifoldGeom> {
     let (_, _, c1, c2) = closest_segment_segment(a0, a1, b0, b1);
     let d = c2 - c1;
     let dist = d.length();
@@ -145,7 +198,10 @@ fn capsule_capsule(a0: Vec3, a1: Vec3, ra: f32, b0: Vec3, b1: Vec3, rb: f32, mar
             crate::math::orthonormal_basis(da.normalize_or(Vec3::Y)).0
         }
     };
-    let mut m = ManifoldGeom { normal: n, ..Default::default() };
+    let mut m = ManifoldGeom {
+        normal: n,
+        ..Default::default()
+    };
     let la = da.length();
     let lb = db.length();
     // Parallel capsules lying side by side get two points for stability.
@@ -159,7 +215,11 @@ fn capsule_capsule(a0: Vec3, a1: Vec3, ra: f32, b0: Vec3, b1: Vec3, rb: f32, mar
                 let (pb, _) = closest_point_segment(pa, b0, b1);
                 let sep = (pb - pa).dot(n) - ra - rb;
                 if sep <= margin {
-                    m.points.push(PointGeom { pa: pa + n * ra, pb: pb - n * rb, separation: sep });
+                    m.points.push(PointGeom {
+                        pa: pa + n * ra,
+                        pb: pb - n * rb,
+                        separation: sep,
+                    });
                 }
             }
             if !m.points.is_empty() {
@@ -167,7 +227,11 @@ fn capsule_capsule(a0: Vec3, a1: Vec3, ra: f32, b0: Vec3, b1: Vec3, rb: f32, mar
             }
         }
     }
-    m.points.push(PointGeom { pa: c1 + n * ra, pb: c2 - n * rb, separation: dist - ra - rb });
+    m.points.push(PointGeom {
+        pa: c1 + n * ra,
+        pb: c2 - n * rb,
+        separation: dist - ra - rb,
+    });
     Some(m)
 }
 
@@ -185,7 +249,8 @@ pub struct WorldPoly {
 
 impl WorldPoly {
     pub fn from_hull(h: &ConvexHull, pose: &Pose) -> Self {
-        let verts: SmallVec<[Vec3; 32]> = h.verts.iter().map(|v| pose.transform_point(*v)).collect();
+        let verts: SmallVec<[Vec3; 32]> =
+            h.verts.iter().map(|v| pose.transform_point(*v)).collect();
         let planes = h
             .faces
             .iter()
@@ -220,7 +285,14 @@ impl WorldPoly {
         planes.push((-n, -n.dot(a)));
         let mut verts = SmallVec::new();
         verts.extend_from_slice(&[a, b, c]);
-        WorldPoly { verts, planes, faces, loops, edges, centroid: (a + b + c) / 3.0 }
+        WorldPoly {
+            verts,
+            planes,
+            faces,
+            loops,
+            edges,
+            centroid: (a + b + c) / 3.0,
+        }
     }
 
     #[inline]
@@ -250,7 +322,10 @@ struct EdgeQuery {
 }
 
 fn query_faces(a: &WorldPoly, b: &WorldPoly) -> FaceQuery {
-    let mut best = FaceQuery { sep: f32::MIN, face: 0 };
+    let mut best = FaceQuery {
+        sep: f32::MIN,
+        face: 0,
+    };
     for (i, (n, d)) in a.planes.iter().enumerate() {
         let s = b.min_along(*n) - d;
         if s > best.sep {
@@ -270,7 +345,12 @@ fn is_minkowski_face(a: Vec3, b: Vec3, bxa: Vec3, c: Vec3, d: Vec3, dxc: Vec3) -
 }
 
 fn query_edges(a: &WorldPoly, b: &WorldPoly) -> EdgeQuery {
-    let mut best = EdgeQuery { sep: f32::MIN, ea: 0, eb: 0, axis: Vec3::ZERO };
+    let mut best = EdgeQuery {
+        sep: f32::MIN,
+        ea: 0,
+        eb: 0,
+        axis: Vec3::ZERO,
+    };
     for (ia, &(a0, a1, af0, af1)) in a.edges.iter().enumerate() {
         let pa = a.verts[a0 as usize];
         let qa = a.verts[a1 as usize];
@@ -298,7 +378,12 @@ fn query_edges(a: &WorldPoly, b: &WorldPoly) -> EdgeQuery {
             }
             let s = axis.dot(pb - pa);
             if s > best.sep {
-                best = EdgeQuery { sep: s, ea: ia, eb: ib, axis };
+                best = EdgeQuery {
+                    sep: s,
+                    ea: ia,
+                    eb: ib,
+                    axis,
+                };
             }
         }
     }
@@ -337,9 +422,21 @@ pub fn poly_poly(a: &WorldPoly, b: &WorldPoly, margin: f32) -> Option<ManifoldGe
 fn edge_contact(a: &WorldPoly, b: &WorldPoly, q: &EdgeQuery) -> ManifoldGeom {
     let (a0, a1, _, _) = a.edges[q.ea];
     let (b0, b1, _, _) = b.edges[q.eb];
-    let (_, _, c1, c2) = closest_segment_segment(a.verts[a0 as usize], a.verts[a1 as usize], b.verts[b0 as usize], b.verts[b1 as usize]);
-    let mut m = ManifoldGeom { normal: q.axis, ..Default::default() };
-    m.points.push(PointGeom { pa: c1, pb: c2, separation: q.sep });
+    let (_, _, c1, c2) = closest_segment_segment(
+        a.verts[a0 as usize],
+        a.verts[a1 as usize],
+        b.verts[b0 as usize],
+        b.verts[b1 as usize],
+    );
+    let mut m = ManifoldGeom {
+        normal: q.axis,
+        ..Default::default()
+    };
+    m.points.push(PointGeom {
+        pa: c1,
+        pb: c2,
+        separation: q.sep,
+    });
     m
 }
 
@@ -356,7 +453,11 @@ fn face_contact(refp: &WorldPoly, rf: usize, inc: &WorldPoly, margin: f32) -> Op
             inc_face = i;
         }
     }
-    let mut poly: SmallVec<[Vec3; 16]> = inc.face_loop(inc_face).iter().map(|&i| inc.verts[i as usize]).collect();
+    let mut poly: SmallVec<[Vec3; 16]> = inc
+        .face_loop(inc_face)
+        .iter()
+        .map(|&i| inc.verts[i as usize])
+        .collect();
     let rl = refp.face_loop(rf);
     let mut tmp: SmallVec<[Vec3; 16]> = SmallVec::new();
     for k in 0..rl.len() {
@@ -375,12 +476,19 @@ fn face_contact(refp: &WorldPoly, rf: usize, inc: &WorldPoly, margin: f32) -> Op
             return None;
         }
     }
-    let mut m = ManifoldGeom { normal: n, ..Default::default() };
+    let mut m = ManifoldGeom {
+        normal: n,
+        ..Default::default()
+    };
     let mut pts: SmallVec<[PointGeom; 16]> = SmallVec::new();
     for p in &poly {
         let s = n.dot(*p) - d;
         if s <= margin {
-            pts.push(PointGeom { pa: *p - n * s, pb: *p, separation: s });
+            pts.push(PointGeom {
+                pa: *p - n * s,
+                pb: *p,
+                separation: s,
+            });
         }
     }
     if pts.is_empty() {
@@ -419,12 +527,23 @@ fn reduce_points(pts: &[PointGeom], n: Vec3, out: &mut SmallVec<[PointGeom; 4]>)
         out.extend_from_slice(pts);
         return;
     }
-    let deepest = (0..pts.len()).min_by(|&i, &j| pts[i].separation.total_cmp(&pts[j].separation)).unwrap();
+    let deepest = (0..pts.len())
+        .min_by(|&i, &j| pts[i].separation.total_cmp(&pts[j].separation))
+        .unwrap();
     let p0 = pts[deepest].pb;
-    let i1 = (0..pts.len()).max_by(|&i, &j| pts[i].pb.distance_squared(p0).total_cmp(&pts[j].pb.distance_squared(p0))).unwrap();
+    let i1 = (0..pts.len())
+        .max_by(|&i, &j| {
+            pts[i]
+                .pb
+                .distance_squared(p0)
+                .total_cmp(&pts[j].pb.distance_squared(p0))
+        })
+        .unwrap();
     let p1 = pts[i1].pb;
     let area = |q: Vec3| (p1 - p0).cross(q - p0).dot(n);
-    let i2 = (0..pts.len()).max_by(|&i, &j| area(pts[i].pb).abs().total_cmp(&area(pts[j].pb).abs())).unwrap();
+    let i2 = (0..pts.len())
+        .max_by(|&i, &j| area(pts[i].pb).abs().total_cmp(&area(pts[j].pb).abs()))
+        .unwrap();
     let sign = area(pts[i2].pb).signum();
     let p2 = pts[i2].pb;
     // Fourth point: maximise the area added on the opposite side of the triangle.
@@ -451,13 +570,20 @@ fn reduce_points(pts: &[PointGeom], n: Vec3, out: &mut SmallVec<[PointGeom; 4]>)
 
 /// Point or segment core (inflated by `r`) vs polytope.
 fn core_poly(core: &[Vec3], r: f32, poly: &WorldPoly, margin: f32) -> Option<ManifoldGeom> {
-    let g = gjk_distance(&PointSet(core), &PointSet(&poly.verts), poly.centroid - core[0]);
+    let g = gjk_distance(
+        &PointSet(core),
+        &PointSet(&poly.verts),
+        poly.centroid - core[0],
+    );
     if !g.overlap && g.distance > 1e-5 {
         if g.distance - r > margin {
             return None;
         }
         let n = g.normal;
-        let mut m = ManifoldGeom { normal: n, ..Default::default() };
+        let mut m = ManifoldGeom {
+            normal: n,
+            ..Default::default()
+        };
         if core.len() == 2 {
             // Segment lying flat on a face: two points from clipping the segment to the face.
             let mut best_face = 0;
@@ -491,7 +617,11 @@ fn core_poly(core: &[Vec3], r: f32, poly: &WorldPoly, margin: f32) -> Option<Man
                         let h = fnrm.dot(*p) - fd;
                         let s = h - r;
                         if s <= margin {
-                            m.points.push(PointGeom { pa: *p - fnrm * r, pb: *p - fnrm * h, separation: s });
+                            m.points.push(PointGeom {
+                                pa: *p - fnrm * r,
+                                pb: *p - fnrm * h,
+                                separation: s,
+                            });
                         }
                     }
                     if !m.points.is_empty() {
@@ -501,7 +631,11 @@ fn core_poly(core: &[Vec3], r: f32, poly: &WorldPoly, margin: f32) -> Option<Man
                 }
             }
         }
-        m.points.push(PointGeom { pa: g.point_a + n * r, pb: g.point_b, separation: g.distance - r });
+        m.points.push(PointGeom {
+            pa: g.point_a + n * r,
+            pb: g.point_b,
+            separation: g.distance - r,
+        });
         return Some(m);
     }
     // Deep: the core is inside the polytope. Use the face of least penetration.
@@ -515,12 +649,19 @@ fn core_poly(core: &[Vec3], r: f32, poly: &WorldPoly, margin: f32) -> Option<Man
         }
     }
     let (fnrm, fd) = poly.planes[best_face];
-    let mut m = ManifoldGeom { normal: -fnrm, ..Default::default() };
+    let mut m = ManifoldGeom {
+        normal: -fnrm,
+        ..Default::default()
+    };
     for p in core {
         let h = fnrm.dot(*p) - fd;
         let s = h - r;
         if s <= margin.max(best - r + 0.01) {
-            m.points.push(PointGeom { pa: *p - fnrm * r, pb: *p - fnrm * h, separation: s });
+            m.points.push(PointGeom {
+                pa: *p - fnrm * r,
+                pb: *p - fnrm * h,
+                separation: s,
+            });
         }
     }
     if m.points.is_empty() {
@@ -544,30 +685,46 @@ fn clip_segment(pts: &mut SmallVec<[Vec3; 16]>, n: Vec3, d: f32) -> bool {
     true
 }
 
-fn collide_mesh(sa: &Shape, pa: &Pose, mesh: &TriMesh, pm: &Pose, margin: f32, out: &mut Vec<ManifoldGeom>) {
+fn collide_mesh(
+    sa: &Shape,
+    pa: &Pose,
+    mesh: &TriMesh,
+    pm: &Pose,
+    margin: f32,
+    out: &mut Vec<ManifoldGeom>,
+) {
     let world_box = sa.aabb(pa).expanded(margin);
     let local_box = world_box.transformed(&pm.inverse());
     let hull_poly = sa.hull().map(|h| WorldPoly::from_hull(h, pa));
     mesh.bvh.query_aabb(&local_box, |ti| {
         let [a, b, c] = mesh.triangle(ti);
-        let (a, b, c) = (pm.transform_point(a), pm.transform_point(b), pm.transform_point(c));
+        let (a, b, c) = (
+            pm.transform_point(a),
+            pm.transform_point(b),
+            pm.transform_point(c),
+        );
         let n = pm.transform_vector(mesh.normals[ti]);
         let flags = mesh.edge_flags[ti];
         let m = match sa {
             Shape::Sphere { radius } => sphere_triangle(pa.p, *radius, a, b, c, n, flags, margin),
-            Shape::Capsule { half_height, radius } => {
+            Shape::Capsule {
+                half_height,
+                radius,
+            } => {
                 let (s0, s1) = capsule_segment(*half_height, pa);
                 // One-sided: ignore capsules whose core is fully behind the triangle.
                 if (s0 - a).dot(n) < -radius && (s1 - a).dot(n) < -radius {
                     None
                 } else {
                     let tri = WorldPoly::triangle(a, b, c);
-                    core_poly(&[s0, s1], *radius, &tri, margin).filter(|m| m.normal.dot(n) < 0.3).map(|mut m| {
-                        if flags == 0 {
-                            snap_to_face(&mut m, n, a);
-                        }
-                        m
-                    })
+                    core_poly(&[s0, s1], *radius, &tri, margin)
+                        .filter(|m| m.normal.dot(n) < 0.3)
+                        .map(|mut m| {
+                            if flags == 0 {
+                                snap_to_face(&mut m, n, a);
+                            }
+                            m
+                        })
                 }
             }
             _ => {
@@ -610,7 +767,16 @@ fn snap_to_face(m: &mut ManifoldGeom, n: Vec3, a: Vec3) {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn sphere_triangle(c: Vec3, r: f32, a: Vec3, b: Vec3, cc: Vec3, n: Vec3, flags: u8, margin: f32) -> Option<ManifoldGeom> {
+fn sphere_triangle(
+    c: Vec3,
+    r: f32,
+    a: Vec3,
+    b: Vec3,
+    cc: Vec3,
+    n: Vec3,
+    flags: u8,
+    margin: f32,
+) -> Option<ManifoldGeom> {
     let h = (c - a).dot(n);
     if h < 0.0 {
         return None;
@@ -637,13 +803,27 @@ fn sphere_triangle(c: Vec3, r: f32, a: Vec3, b: Vec3, cc: Vec3, n: Vec3, flags: 
         };
         if on_inactive {
             normal = -n;
-            let mut m = ManifoldGeom { normal, ..Default::default() };
-            m.points.push(PointGeom { pa: c - n * r, pb: c - n * h, separation: h - r });
+            let mut m = ManifoldGeom {
+                normal,
+                ..Default::default()
+            };
+            m.points.push(PointGeom {
+                pa: c - n * r,
+                pb: c - n * h,
+                separation: h - r,
+            });
             return Some(m);
         }
     }
-    let mut m = ManifoldGeom { normal, ..Default::default() };
-    m.points.push(PointGeom { pa: c + normal * r, pb: q, separation: dist - r });
+    let mut m = ManifoldGeom {
+        normal,
+        ..Default::default()
+    };
+    m.points.push(PointGeom {
+        pa: c + normal * r,
+        pb: q,
+        separation: dist - r,
+    });
     Some(m)
 }
 
@@ -680,10 +860,19 @@ mod tests {
     fn box_resting_on_box_gives_four_points() {
         let ground = Shape::cuboid(Vec3::new(10.0, 0.5, 10.0));
         let cube = Shape::cuboid(Vec3::splat(0.5));
-        let m = manifolds(&cube, Pose::from_translation(Vec3::new(0.0, 0.99, 0.0)), &ground, Pose::IDENTITY);
+        let m = manifolds(
+            &cube,
+            Pose::from_translation(Vec3::new(0.0, 0.99, 0.0)),
+            &ground,
+            Pose::IDENTITY,
+        );
         assert_eq!(m.len(), 1);
         assert_eq!(m[0].points.len(), 4);
-        assert!((m[0].normal - -Vec3::Y).length() < 1e-4, "{:?}", m[0].normal);
+        assert!(
+            (m[0].normal - -Vec3::Y).length() < 1e-4,
+            "{:?}",
+            m[0].normal
+        );
         for p in &m[0].points {
             assert!((p.separation + 0.01).abs() < 1e-4);
         }
@@ -692,7 +881,8 @@ mod tests {
     #[test]
     fn rotated_box_edge_contact() {
         let a = Shape::cuboid(Vec3::splat(0.5));
-        let q = Quat::from_rotation_z(std::f32::consts::FRAC_PI_4) * Quat::from_rotation_x(std::f32::consts::FRAC_PI_4);
+        let q = Quat::from_rotation_z(std::f32::consts::FRAC_PI_4)
+            * Quat::from_rotation_x(std::f32::consts::FRAC_PI_4);
         let pb = Pose::new(Vec3::new(0.0, 0.5 + 0.70, 0.0), q);
         let m = manifolds(&a, Pose::IDENTITY, &a, pb);
         assert_eq!(m.len(), 1);
@@ -704,32 +894,60 @@ mod tests {
     fn sphere_and_capsule_on_box() {
         let ground = Shape::cuboid(Vec3::new(10.0, 0.5, 10.0));
         let s = Shape::sphere(0.5);
-        let m = manifolds(&s, Pose::from_translation(Vec3::new(1.0, 0.98, 0.0)), &ground, Pose::IDENTITY);
+        let m = manifolds(
+            &s,
+            Pose::from_translation(Vec3::new(1.0, 0.98, 0.0)),
+            &ground,
+            Pose::IDENTITY,
+        );
         assert_eq!(m.len(), 1);
         assert!((m[0].points[0].separation + 0.02).abs() < 1e-4);
         let c = Shape::capsule(1.0, 0.25);
-        let lying = Pose::new(Vec3::new(0.0, 0.74, 0.0), Quat::from_rotation_z(std::f32::consts::FRAC_PI_2));
+        let lying = Pose::new(
+            Vec3::new(0.0, 0.74, 0.0),
+            Quat::from_rotation_z(std::f32::consts::FRAC_PI_2),
+        );
         let m = manifolds(&c, lying, &ground, Pose::IDENTITY);
         assert_eq!(m[0].points.len(), 2);
         assert!((m[0].normal - -Vec3::Y).length() < 1e-4);
         // Deep sphere inside the box.
-        let m = manifolds(&s, Pose::from_translation(Vec3::new(0.0, 0.3, 0.0)), &ground, Pose::IDENTITY);
+        let m = manifolds(
+            &s,
+            Pose::from_translation(Vec3::new(0.0, 0.3, 0.0)),
+            &ground,
+            Pose::IDENTITY,
+        );
         assert!((m[0].normal - -Vec3::Y).length() < 1e-4 && m[0].points[0].separation < -0.6);
     }
 
     #[test]
     fn box_on_trimesh_ground() {
-        let v = vec![Vec3::new(-10.0, 0.0, -10.0), Vec3::new(10.0, 0.0, -10.0), Vec3::new(10.0, 0.0, 10.0), Vec3::new(-10.0, 0.0, 10.0)];
+        let v = vec![
+            Vec3::new(-10.0, 0.0, -10.0),
+            Vec3::new(10.0, 0.0, -10.0),
+            Vec3::new(10.0, 0.0, 10.0),
+            Vec3::new(-10.0, 0.0, 10.0),
+        ];
         let mesh = Shape::trimesh(v, vec![[0, 2, 1], [0, 3, 2]]);
         let cube = Shape::cuboid(Vec3::splat(0.5));
-        let m = manifolds(&cube, Pose::from_translation(Vec3::new(0.3, 0.49, 0.2)), &mesh, Pose::IDENTITY);
+        let m = manifolds(
+            &cube,
+            Pose::from_translation(Vec3::new(0.3, 0.49, 0.2)),
+            &mesh,
+            Pose::IDENTITY,
+        );
         let total: usize = m.iter().map(|m| m.points.len()).sum();
         assert!(total >= 4, "{total}");
         for mm in &m {
             assert!((mm.normal - -Vec3::Y).length() < 1e-3, "{:?}", mm.normal);
         }
         let s = Shape::sphere(0.5);
-        let m = manifolds(&s, Pose::from_translation(Vec3::new(0.0, 0.49, 0.0)), &mesh, Pose::IDENTITY);
+        let m = manifolds(
+            &s,
+            Pose::from_translation(Vec3::new(0.0, 0.49, 0.0)),
+            &mesh,
+            Pose::IDENTITY,
+        );
         assert!(!m.is_empty() && (m[0].normal + Vec3::Y).length() < 1e-3);
     }
 }

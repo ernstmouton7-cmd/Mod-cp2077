@@ -20,13 +20,24 @@ pub struct Bvh {
 
 impl Bvh {
     pub fn build(boxes: &[Aabb]) -> Self {
-        let mut bvh = Bvh { nodes: Vec::with_capacity(boxes.len() * 2), indices: (0..boxes.len() as u32).collect() };
+        let mut bvh = Bvh {
+            nodes: Vec::with_capacity(boxes.len() * 2),
+            indices: (0..boxes.len() as u32).collect(),
+        };
         if boxes.is_empty() {
-            bvh.nodes.push(Node { aabb: Aabb::new(Vec3::ZERO, Vec3::ZERO), first: 0, count: 0 });
+            bvh.nodes.push(Node {
+                aabb: Aabb::new(Vec3::ZERO, Vec3::ZERO),
+                first: 0,
+                count: 0,
+            });
             return bvh;
         }
         let centers: Vec<Vec3> = boxes.iter().map(|b| b.center()).collect();
-        bvh.nodes.push(Node { aabb: Aabb::EMPTY, first: 0, count: 0 });
+        bvh.nodes.push(Node {
+            aabb: Aabb::EMPTY,
+            first: 0,
+            count: 0,
+        });
         bvh.split(0, 0, boxes.len(), boxes, &centers);
         bvh
     }
@@ -46,12 +57,28 @@ impl Bvh {
             return;
         }
         let ext = cb.max - cb.min;
-        let axis = if ext.x >= ext.y && ext.x >= ext.z { 0 } else if ext.y >= ext.z { 1 } else { 2 };
+        let axis = if ext.x >= ext.y && ext.x >= ext.z {
+            0
+        } else if ext.y >= ext.z {
+            1
+        } else {
+            2
+        };
         let mid = start + n / 2;
-        self.indices[start..end].select_nth_unstable_by(n / 2, |a, b| centers[*a as usize][axis].total_cmp(&centers[*b as usize][axis]));
+        self.indices[start..end].select_nth_unstable_by(n / 2, |a, b| {
+            centers[*a as usize][axis].total_cmp(&centers[*b as usize][axis])
+        });
         let left = self.nodes.len();
-        self.nodes.push(Node { aabb: Aabb::EMPTY, first: 0, count: 0 });
-        self.nodes.push(Node { aabb: Aabb::EMPTY, first: 0, count: 0 });
+        self.nodes.push(Node {
+            aabb: Aabb::EMPTY,
+            first: 0,
+            count: 0,
+        });
+        self.nodes.push(Node {
+            aabb: Aabb::EMPTY,
+            first: 0,
+            count: 0,
+        });
         self.nodes[node].first = left as u32;
         self.nodes[node].count = 0;
         self.split(left, start, mid, boxes, centers);
@@ -88,7 +115,13 @@ impl Bvh {
     }
 
     /// Ray traversal; `f(prim, t_max)` returns the (possibly shortened) max distance.
-    pub fn ray_cast(&self, origin: Vec3, dir: Vec3, max_t: f32, f: &mut dyn FnMut(usize, f32) -> f32) {
+    pub fn ray_cast(
+        &self,
+        origin: Vec3,
+        dir: Vec3,
+        max_t: f32,
+        f: &mut dyn FnMut(usize, f32) -> f32,
+    ) {
         if self.indices.is_empty() {
             return;
         }

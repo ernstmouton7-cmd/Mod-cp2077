@@ -32,11 +32,25 @@ pub enum JointKind {
     /// Shared point; free rotation.
     Ball,
     /// Locks all relative motion. Non-zero hertz makes it a spring (bendable poles, flexible mounts).
-    Weld { linear_hertz: f32, angular_hertz: f32, damping_ratio: f32 },
+    Weld {
+        linear_hertz: f32,
+        angular_hertz: f32,
+        damping_ratio: f32,
+    },
     /// Rotation about the frame X axis.
-    Hinge { limits: Option<HingeLimits>, motor: Option<HingeMotor>, spring: Option<HingeSpring> },
+    Hinge {
+        limits: Option<HingeLimits>,
+        motor: Option<HingeMotor>,
+        spring: Option<HingeSpring>,
+    },
     /// Keeps anchor distance within [min, max]; with hertz > 0 it is a spring toward `rest`.
-    Distance { rest: f32, min: f32, max: f32, hertz: f32, damping_ratio: f32 },
+    Distance {
+        rest: f32,
+        min: f32,
+        max: f32,
+        hertz: f32,
+        damping_ratio: f32,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -57,8 +71,24 @@ pub struct JointDesc {
 }
 
 impl JointDesc {
-    pub fn new(body_a: BodyHandle, body_b: BodyHandle, frame_a: Pose, frame_b: Pose, kind: JointKind) -> Self {
-        Self { body_a, body_b, frame_a, frame_b, kind, collide_connected: false, break_force: f32::INFINITY, break_torque: f32::INFINITY, user_data: 0 }
+    pub fn new(
+        body_a: BodyHandle,
+        body_b: BodyHandle,
+        frame_a: Pose,
+        frame_b: Pose,
+        kind: JointKind,
+    ) -> Self {
+        Self {
+            body_a,
+            body_b,
+            frame_a,
+            frame_b,
+            kind,
+            collide_connected: false,
+            break_force: f32::INFINITY,
+            break_torque: f32::INFINITY,
+            user_data: 0,
+        }
     }
     pub fn breakable(mut self, force: f32, torque: f32) -> Self {
         self.break_force = force;
@@ -101,7 +131,13 @@ pub(crate) struct JointState {
 
 impl Joint {
     pub(crate) fn new(desc: JointDesc) -> Self {
-        Joint { desc, broken: false, force: 0.0, torque: 0.0, state: JointState::default() }
+        Joint {
+            desc,
+            broken: false,
+            force: 0.0,
+            torque: 0.0,
+            state: JointState::default(),
+        }
     }
 
     /// Current hinge angle (rad) given the two body orientations.
@@ -114,7 +150,14 @@ impl Joint {
         ya.cross(yb).dot(axis).atan2(ya.dot(yb))
     }
 
-    pub(crate) fn prepare(&mut self, a: u32, b: u32, bodies: &[SolverBody], h: f32, joint_soft: Softness) {
+    pub(crate) fn prepare(
+        &mut self,
+        a: u32,
+        b: u32,
+        bodies: &[SolverBody],
+        h: f32,
+        joint_soft: Softness,
+    ) {
         let s = &mut self.state;
         s.a = a;
         s.b = b;
@@ -126,14 +169,32 @@ impl Joint {
         s.peak_lin = 0.0;
         s.peak_ang = 0.0;
         match &self.desc.kind {
-            JointKind::Weld { linear_hertz, angular_hertz, damping_ratio } => {
-                s.lin_soft = if *linear_hertz > 0.0 { Softness::new(*linear_hertz, *damping_ratio, h) } else { joint_soft };
-                s.ang_soft = if *angular_hertz > 0.0 { Softness::new(*angular_hertz, *damping_ratio, h) } else { joint_soft };
+            JointKind::Weld {
+                linear_hertz,
+                angular_hertz,
+                damping_ratio,
+            } => {
+                s.lin_soft = if *linear_hertz > 0.0 {
+                    Softness::new(*linear_hertz, *damping_ratio, h)
+                } else {
+                    joint_soft
+                };
+                s.ang_soft = if *angular_hertz > 0.0 {
+                    Softness::new(*angular_hertz, *damping_ratio, h)
+                } else {
+                    joint_soft
+                };
             }
-            JointKind::Hinge { spring: Some(sp), .. } => {
+            JointKind::Hinge {
+                spring: Some(sp), ..
+            } => {
                 s.spring_soft = Softness::new(sp.hertz, sp.damping_ratio, h);
             }
-            JointKind::Distance { hertz, damping_ratio, .. } => {
+            JointKind::Distance {
+                hertz,
+                damping_ratio,
+                ..
+            } => {
                 s.spring_soft = Softness::new(*hertz, *damping_ratio, h);
             }
             _ => {}
@@ -150,7 +211,9 @@ impl Joint {
         if let JointKind::Hinge { .. } = self.desc.kind {
             let axis = fa * Vec3::X;
             let (y, z) = (fa * Vec3::Y, fa * Vec3::Z);
-            ang = y * s.hinge_impulse.x + z * s.hinge_impulse.y + axis * (s.limit_impulse - s.upper_impulse + s.motor_impulse + s.spring_impulse);
+            ang = y * s.hinge_impulse.x
+                + z * s.hinge_impulse.y
+                + axis * (s.limit_impulse - s.upper_impulse + s.motor_impulse + s.spring_impulse);
         }
         let mut lin = s.lin_impulse;
         if let JointKind::Distance { .. } = self.desc.kind {
@@ -184,7 +247,11 @@ impl Joint {
                 }
                 let c = Vec3::new(qe.x, qe.y, qe.z) * 2.0;
                 let (bias, ms, is) = if use_bias {
-                    (c * s.ang_soft.bias_rate, s.ang_soft.mass_scale, s.ang_soft.impulse_scale)
+                    (
+                        c * s.ang_soft.bias_rate,
+                        s.ang_soft.mass_scale,
+                        s.ang_soft.impulse_scale,
+                    )
                 } else {
                     (Vec3::ZERO, 1.0, 0.0)
                 };
@@ -196,7 +263,11 @@ impl Joint {
                 ba.apply_angular_impulse(-impulse);
                 bb.apply_angular_impulse(impulse);
             }
-            JointKind::Hinge { limits, motor, spring } => {
+            JointKind::Hinge {
+                limits,
+                motor,
+                spring,
+            } => {
                 let axis = fa * Vec3::X;
                 let axis_b = fb * Vec3::X;
                 let k_axial = axis.dot(inv_i_sum * axis);
@@ -210,7 +281,8 @@ impl Joint {
                         let c = angle - sp.target;
                         let bias = c * s.spring_soft.bias_rate;
                         let cdot = axis.dot(bb.w - ba.w);
-                        let impulse = -m_axial * s.spring_soft.mass_scale * (cdot + bias) - s.spring_soft.impulse_scale * s.spring_impulse;
+                        let impulse = -m_axial * s.spring_soft.mass_scale * (cdot + bias)
+                            - s.spring_soft.impulse_scale * s.spring_impulse;
                         s.spring_impulse += impulse;
                         ba.apply_angular_impulse(-axis * impulse);
                         bb.apply_angular_impulse(axis * impulse);
@@ -232,11 +304,19 @@ impl Joint {
                         let (bias, ms, is) = if c > 0.0 {
                             (c * inv_h, 1.0, 0.0)
                         } else if use_bias {
-                            (c * s.soft.bias_rate, s.soft.mass_scale, s.soft.impulse_scale)
+                            (
+                                c * s.soft.bias_rate,
+                                s.soft.mass_scale,
+                                s.soft.impulse_scale,
+                            )
                         } else {
                             (0.0, 1.0, 0.0)
                         };
-                        let acc = if sign > 0.0 { &mut s.limit_impulse } else { &mut s.upper_impulse };
+                        let acc = if sign > 0.0 {
+                            &mut s.limit_impulse
+                        } else {
+                            &mut s.upper_impulse
+                        };
                         let cdot = sign * axis.dot(bb.w - ba.w);
                         let impulse = -m_axial * ms * (cdot + bias) - is * *acc;
                         let new = (*acc + impulse).max(0.0);
@@ -252,7 +332,15 @@ impl Joint {
                 let z = fa * Vec3::Z;
                 let err = axis.cross(axis_b);
                 let c = Vec2::new(y.dot(err), z.dot(err));
-                let (bias, ms, is) = if use_bias { (c * s.soft.bias_rate, s.soft.mass_scale, s.soft.impulse_scale) } else { (Vec2::ZERO, 1.0, 0.0) };
+                let (bias, ms, is) = if use_bias {
+                    (
+                        c * s.soft.bias_rate,
+                        s.soft.mass_scale,
+                        s.soft.impulse_scale,
+                    )
+                } else {
+                    (Vec2::ZERO, 1.0, 0.0)
+                };
                 let dw = bb.w - ba.w;
                 let cdot = Vec2::new(y.dot(dw), z.dot(dw));
                 let k = Mat2::from_cols(
@@ -273,7 +361,13 @@ impl Joint {
         }
 
         match &kind {
-            JointKind::Distance { rest, min, max, hertz, .. } => {
+            JointKind::Distance {
+                rest,
+                min,
+                max,
+                hertz,
+                ..
+            } => {
                 let pa = ba.c + ra;
                 let pb = bb.c + rb;
                 let d = pb - pa;
@@ -284,20 +378,26 @@ impl Joint {
                 let u = d / len;
                 let rna = ra.cross(u);
                 let rnb = rb.cross(u);
-                let k = ba.inv_mass + bb.inv_mass + rna.dot(ba.inv_i * rna) + rnb.dot(bb.inv_i * rnb);
+                let k =
+                    ba.inv_mass + bb.inv_mass + rna.dot(ba.inv_i * rna) + rnb.dot(bb.inv_i * rnb);
                 let m = if k > 0.0 { 1.0 / k } else { 0.0 };
                 let vr = u.dot(bb.velocity_at(rb) - ba.velocity_at(ra));
                 let mut impulse = 0.0;
                 if *hertz > 0.0 {
                     let c = len - rest;
-                    impulse += -m * s.spring_soft.mass_scale * (vr + c * s.spring_soft.bias_rate) - s.spring_soft.impulse_scale * s.axial_impulse;
+                    impulse += -m * s.spring_soft.mass_scale * (vr + c * s.spring_soft.bias_rate)
+                        - s.spring_soft.impulse_scale * s.axial_impulse;
                 }
                 // Hard limits.
                 if len < *min || len > *max {
                     let c = if len < *min { len - min } else { len - max };
                     let bias = if use_bias { c * s.soft.bias_rate } else { 0.0 };
                     let lim = -m * (vr + bias);
-                    impulse += if len < *min { lim.max(0.0) } else { lim.min(0.0) };
+                    impulse += if len < *min {
+                        lim.max(0.0)
+                    } else {
+                        lim.min(0.0)
+                    };
                 } else if *hertz <= 0.0 {
                     return;
                 }
@@ -307,13 +407,23 @@ impl Joint {
                 bb.apply_impulse(u * impulse, rb);
             }
             _ => {
-                let soft = if let JointKind::Weld { .. } = kind { s.lin_soft } else { s.soft };
+                let soft = if let JointKind::Weld { .. } = kind {
+                    s.lin_soft
+                } else {
+                    s.soft
+                };
                 let c = (bb.c + rb) - (ba.c + ra);
-                let (bias, ms, is) = if use_bias { (c * soft.bias_rate, soft.mass_scale, soft.impulse_scale) } else { (Vec3::ZERO, 1.0, 0.0) };
+                let (bias, ms, is) = if use_bias {
+                    (c * soft.bias_rate, soft.mass_scale, soft.impulse_scale)
+                } else {
+                    (Vec3::ZERO, 1.0, 0.0)
+                };
                 let cdot = bb.velocity_at(rb) - ba.velocity_at(ra);
                 let sa = skew(ra);
                 let sb = skew(rb);
-                let k = Mat3::from_diagonal(Vec3::splat(ba.inv_mass + bb.inv_mass)) - sa * ba.inv_i * sa - sb * bb.inv_i * sb;
+                let k = Mat3::from_diagonal(Vec3::splat(ba.inv_mass + bb.inv_mass))
+                    - sa * ba.inv_i * sa
+                    - sb * bb.inv_i * sb;
                 let impulse = -(inverse_or_zero(k) * (cdot + bias)) * ms - s.lin_impulse * is;
                 s.lin_impulse += impulse;
                 s.peak_lin = s.peak_lin.max(s.lin_impulse.length());

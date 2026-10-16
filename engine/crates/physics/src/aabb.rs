@@ -10,7 +10,10 @@ pub struct Aabb {
 }
 
 impl Aabb {
-    pub const EMPTY: Aabb = Aabb { min: Vec3::splat(f32::MAX), max: Vec3::splat(-f32::MAX) };
+    pub const EMPTY: Aabb = Aabb {
+        min: Vec3::splat(f32::MAX),
+        max: Vec3::splat(-f32::MAX),
+    };
 
     #[inline]
     pub fn new(min: Vec3, max: Vec3) -> Self {
@@ -18,7 +21,10 @@ impl Aabb {
     }
     #[inline]
     pub fn from_center_half(c: Vec3, h: Vec3) -> Self {
-        Self { min: c - h, max: c + h }
+        Self {
+            min: c - h,
+            max: c + h,
+        }
     }
     pub fn from_points(pts: impl IntoIterator<Item = Vec3>) -> Self {
         let mut a = Self::EMPTY;
@@ -30,7 +36,10 @@ impl Aabb {
     }
     #[inline]
     pub fn union(&self, o: &Aabb) -> Aabb {
-        Aabb { min: self.min.min(o.min), max: self.max.max(o.max) }
+        Aabb {
+            min: self.min.min(o.min),
+            max: self.max.max(o.max),
+        }
     }
     #[inline]
     pub fn grow(&mut self, p: Vec3) {
@@ -39,12 +48,18 @@ impl Aabb {
     }
     #[inline]
     pub fn expanded(&self, m: f32) -> Aabb {
-        Aabb { min: self.min - Vec3::splat(m), max: self.max + Vec3::splat(m) }
+        Aabb {
+            min: self.min - Vec3::splat(m),
+            max: self.max + Vec3::splat(m),
+        }
     }
     /// Extend in the direction of a displacement (for swept/predicted bounds).
     #[inline]
     pub fn swept(&self, d: Vec3) -> Aabb {
-        Aabb { min: self.min + d.min(Vec3::ZERO), max: self.max + d.max(Vec3::ZERO) }
+        Aabb {
+            min: self.min + d.min(Vec3::ZERO),
+            max: self.max + d.max(Vec3::ZERO),
+        }
     }
     #[inline]
     pub fn contains(&self, o: &Aabb) -> bool {

@@ -20,15 +20,27 @@ pub struct Softness {
 impl Softness {
     pub fn new(hertz: f32, zeta: f32, h: f32) -> Self {
         if hertz <= 0.0 {
-            return Softness { bias_rate: 0.0, mass_scale: 1.0, impulse_scale: 0.0 };
+            return Softness {
+                bias_rate: 0.0,
+                mass_scale: 1.0,
+                impulse_scale: 0.0,
+            };
         }
         let omega = 2.0 * std::f32::consts::PI * hertz;
         let a1 = 2.0 * zeta + h * omega;
         let a2 = h * omega * a1;
         let a3 = 1.0 / (1.0 + a2);
-        Softness { bias_rate: omega / a1, mass_scale: a2 * a3, impulse_scale: a3 }
+        Softness {
+            bias_rate: omega / a1,
+            mass_scale: a2 * a3,
+            impulse_scale: a3,
+        }
     }
-    pub const RIGID: Softness = Softness { bias_rate: 0.0, mass_scale: 1.0, impulse_scale: 0.0 };
+    pub const RIGID: Softness = Softness {
+        bias_rate: 0.0,
+        mass_scale: 1.0,
+        impulse_scale: 0.0,
+    };
 }
 
 /// Body state used during the solve.
@@ -180,13 +192,25 @@ pub fn integrate_positions(bodies: &mut [SolverBody], h: f32) {
 }
 
 /// Fill effective masses and anchors. `normal_impulse`/`tangent_impulse` must already hold warm-start values.
-pub fn prepare_contact(c: &mut ContactConstraint, bodies: &[SolverBody], world_points: &[(Vec3, f32)], h: f32, cfg: &SolverConfig, static_soft: Softness, soft: Softness) {
+pub fn prepare_contact(
+    c: &mut ContactConstraint,
+    bodies: &[SolverBody],
+    world_points: &[(Vec3, f32)],
+    h: f32,
+    cfg: &SolverConfig,
+    static_soft: Softness,
+    soft: Softness,
+) {
     let ba = &bodies[c.a as usize];
     let bb = &bodies[c.b as usize];
     let n = c.normal;
     let (t1, t2) = orthonormal_basis(n);
     c.tangents = [t1, t2];
-    c.softness = if ba.inv_mass == 0.0 || bb.inv_mass == 0.0 { static_soft } else { soft };
+    c.softness = if ba.inv_mass == 0.0 || bb.inv_mass == 0.0 {
+        static_soft
+    } else {
+        soft
+    };
     if c.rolling > 0.0 {
         c.rolling_mass = crate::math::inverse_or_zero(ba.inv_i + bb.inv_i);
     }
@@ -209,7 +233,10 @@ pub fn prepare_contact(c: &mut ContactConstraint, bodies: &[SolverBody], world_p
         cp.normal_mass = if kn > 0.0 { 1.0 / kn } else { 0.0 };
         let k1 = k(t1);
         let k2 = k(t2);
-        cp.tangent_mass = [if k1 > 0.0 { 1.0 / k1 } else { 0.0 }, if k2 > 0.0 { 1.0 / k2 } else { 0.0 }];
+        cp.tangent_mass = [
+            if k1 > 0.0 { 1.0 / k1 } else { 0.0 },
+            if k2 > 0.0 { 1.0 / k2 } else { 0.0 },
+        ];
         let vrel = bb.velocity_at(rb) - ba.velocity_at(ra);
         cp.relative_velocity = n.dot(vrel);
         cp.total_normal_impulse = 0.0;
@@ -230,14 +257,20 @@ fn pair(bodies: &mut [SolverBody], a: u32, b: u32) -> (&mut SolverBody, &mut Sol
     }
 }
 
-pub(crate) fn body_pair(bodies: &mut [SolverBody], a: u32, b: u32) -> (&mut SolverBody, &mut SolverBody) {
+pub(crate) fn body_pair(
+    bodies: &mut [SolverBody],
+    a: u32,
+    b: u32,
+) -> (&mut SolverBody, &mut SolverBody) {
     pair(bodies, a, b)
 }
 
 pub fn warm_start_contact(c: &ContactConstraint, bodies: &mut [SolverBody]) {
     let (ba, bb) = pair(bodies, c.a, c.b);
     for cp in &c.points {
-        let p = c.normal * cp.normal_impulse + c.tangents[0] * cp.tangent_impulse[0] + c.tangents[1] * cp.tangent_impulse[1];
+        let p = c.normal * cp.normal_impulse
+            + c.tangents[0] * cp.tangent_impulse[0]
+            + c.tangents[1] * cp.tangent_impulse[1];
         ba.apply_impulse(-p, cp.ra);
         bb.apply_impulse(p, cp.rb);
     }
@@ -245,7 +278,13 @@ pub fn warm_start_contact(c: &ContactConstraint, bodies: &mut [SolverBody]) {
     bb.apply_angular_impulse(c.rolling_impulse);
 }
 
-pub fn solve_contact(c: &mut ContactConstraint, bodies: &mut [SolverBody], inv_h: f32, use_bias: bool, cfg: &SolverConfig) {
+pub fn solve_contact(
+    c: &mut ContactConstraint,
+    bodies: &mut [SolverBody],
+    inv_h: f32,
+    use_bias: bool,
+    cfg: &SolverConfig,
+) {
     let (ba, bb) = pair(bodies, c.a, c.b);
     let n = c.normal;
     let mut total_normal = 0.0;
@@ -258,13 +297,18 @@ pub fn solve_contact(c: &mut ContactConstraint, bodies: &mut [SolverBody], inv_h
             // Speculative: allow closing the gap this substep, no more.
             (s * inv_h, 1.0, 0.0)
         } else if use_bias {
-            ((c.softness.bias_rate * (s + cfg.linear_slop).min(0.0)).max(-cfg.max_push_velocity), c.softness.mass_scale, c.softness.impulse_scale)
+            (
+                (c.softness.bias_rate * (s + cfg.linear_slop).min(0.0)).max(-cfg.max_push_velocity),
+                c.softness.mass_scale,
+                c.softness.impulse_scale,
+            )
         } else {
             (0.0, 1.0, 0.0)
         };
         let vrel = bb.velocity_at(cp.rb) - ba.velocity_at(cp.ra);
         let vn = n.dot(vrel);
-        let impulse = -cp.normal_mass * mass_scale * (vn + bias) - impulse_scale * cp.normal_impulse;
+        let impulse =
+            -cp.normal_mass * mass_scale * (vn + bias) - impulse_scale * cp.normal_impulse;
         let new_impulse = (cp.normal_impulse + impulse).max(0.0);
         let applied = new_impulse - cp.normal_impulse;
         cp.normal_impulse = new_impulse;

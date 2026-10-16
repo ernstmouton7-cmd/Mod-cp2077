@@ -32,7 +32,12 @@ pub struct DynamicTree {
 
 impl DynamicTree {
     pub fn new() -> Self {
-        Self { nodes: Vec::new(), root: NULL, free: Vec::new(), count: 0 }
+        Self {
+            nodes: Vec::new(),
+            root: NULL,
+            free: Vec::new(),
+            count: 0,
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -43,7 +48,14 @@ impl DynamicTree {
     }
 
     fn alloc(&mut self) -> u32 {
-        let n = Node { aabb: Aabb::EMPTY, parent: NULL, child1: NULL, child2: NULL, height: 0, data: 0 };
+        let n = Node {
+            aabb: Aabb::EMPTY,
+            parent: NULL,
+            child1: NULL,
+            child2: NULL,
+            height: 0,
+            data: 0,
+        };
         if let Some(i) = self.free.pop() {
             self.nodes[i as usize] = n;
             i
@@ -107,7 +119,13 @@ impl DynamicTree {
     }
 
     /// `f(proxy, t_max) -> new t_max` (return a negative value to stop).
-    pub fn ray_cast(&self, origin: Vec3, dir: Vec3, max_t: f32, mut f: impl FnMut(u32, f32) -> f32) {
+    pub fn ray_cast(
+        &self,
+        origin: Vec3,
+        dir: Vec3,
+        max_t: f32,
+        mut f: impl FnMut(u32, f32) -> f32,
+    ) {
         if self.root == NULL {
             return;
         }
@@ -269,7 +287,11 @@ impl DynamicTree {
             self.root = up;
         }
         // Keep the taller grandchild under `up`, give the shorter to `a`.
-        let (keep, give) = if self.nodes[f as usize].height > self.nodes[g as usize].height { (f, g) } else { (g, f) };
+        let (keep, give) = if self.nodes[f as usize].height > self.nodes[g as usize].height {
+            (f, g)
+        } else {
+            (g, f)
+        };
         self.nodes[up as usize].child2 = keep;
         let a_is_child1 = self.nodes[a as usize].child1 == up;
         if a_is_child1 {
@@ -302,7 +324,9 @@ impl DynamicTree {
             let (l1, h1) = walk(t, n.child1, i);
             let (l2, h2) = walk(t, n.child2, i);
             assert_eq!(n.height, 1 + h1.max(h2));
-            let u = t.nodes[n.child1 as usize].aabb.union(&t.nodes[n.child2 as usize].aabb);
+            let u = t.nodes[n.child1 as usize]
+                .aabb
+                .union(&t.nodes[n.child2 as usize].aabb);
             assert!(n.aabb.contains(&u));
             (l1 + l2, n.height)
         }
@@ -324,20 +348,29 @@ mod tests {
         for i in 0..200 {
             let x = (i % 20) as f32 * 2.0;
             let z = (i / 20) as f32 * 2.0;
-            ids.push(t.insert(Aabb::from_center_half(Vec3::new(x, 0.0, z), Vec3::splat(0.6)), i));
+            ids.push(t.insert(
+                Aabb::from_center_half(Vec3::new(x, 0.0, z), Vec3::splat(0.6)),
+                i,
+            ));
         }
         assert_eq!(t.validate(), 200);
         let mut hits = 0;
-        t.query(&Aabb::from_center_half(Vec3::new(4.0, 0.0, 4.0), Vec3::splat(0.1)), |_| {
-            hits += 1;
-            true
-        });
+        t.query(
+            &Aabb::from_center_half(Vec3::new(4.0, 0.0, 4.0), Vec3::splat(0.1)),
+            |_| {
+                hits += 1;
+                true
+            },
+        );
         assert_eq!(hits, 1);
         for (k, id) in ids.iter().enumerate() {
             if k % 3 == 0 {
                 t.remove(*id);
             } else {
-                t.update(*id, Aabb::from_center_half(Vec3::new(k as f32, 5.0, 0.0), Vec3::splat(0.4)));
+                t.update(
+                    *id,
+                    Aabb::from_center_half(Vec3::new(k as f32, 5.0, 0.0), Vec3::splat(0.4)),
+                );
             }
         }
         assert_eq!(t.validate(), 200 - 67);

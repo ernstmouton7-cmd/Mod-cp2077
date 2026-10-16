@@ -1,3 +1,4 @@
+#![allow(clippy::too_many_arguments, clippy::needless_range_loop)]
 //! # gridlock-physics
 //!
 //! A general-purpose 3D physics engine written for the Gridlock driving simulation:
@@ -29,10 +30,18 @@ pub mod vehicle;
 pub mod world;
 
 pub use aabb::Aabb;
-pub use body::{layers, BodyDesc, BodyHandle, BodyType, Collider, ColliderDesc, ColliderHandle, CollisionFilter, JointHandle, RigidBody, Surface};
+pub use body::{
+    layers, BodyDesc, BodyHandle, BodyType, Collider, ColliderDesc, ColliderHandle,
+    CollisionFilter, JointHandle, RigidBody, Surface,
+};
 pub use glam;
 pub use joint::{HingeLimits, HingeMotor, HingeSpring, Joint, JointDesc, JointKind};
 pub use math::Pose;
 pub use query::{QueryFilter, QueryView, RayHit};
 pub use shape::{ConvexHull, MassProperties, Shape, TriMesh};
-pub use world::{Contact, Manifold, ManifoldPoint, PhysicsEvent, PhysicsWorld, StepStats, SubstepContext};
+pub use vehicle::{
+    presets::VehicleClass, Assists, Vehicle, VehicleControls, VehicleDesc, VehicleHandle,
+};
+pub use world::{
+    Contact, Manifold, ManifoldPoint, PhysicsEvent, PhysicsWorld, StepStats, SubstepContext,
+};

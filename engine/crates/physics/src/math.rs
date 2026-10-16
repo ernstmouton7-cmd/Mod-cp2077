@@ -16,7 +16,10 @@ impl Default for Pose {
 }
 
 impl Pose {
-    pub const IDENTITY: Pose = Pose { p: Vec3::ZERO, q: Quat::IDENTITY };
+    pub const IDENTITY: Pose = Pose {
+        p: Vec3::ZERO,
+        q: Quat::IDENTITY,
+    };
 
     #[inline]
     pub fn new(p: Vec3, q: Quat) -> Self {
@@ -24,7 +27,10 @@ impl Pose {
     }
     #[inline]
     pub fn from_translation(p: Vec3) -> Self {
-        Self { p, q: Quat::IDENTITY }
+        Self {
+            p,
+            q: Quat::IDENTITY,
+        }
     }
     #[inline]
     pub fn transform_point(&self, v: Vec3) -> Vec3 {
@@ -45,18 +51,27 @@ impl Pose {
     /// `self * other`: apply `other` first, then `self`.
     #[inline]
     pub fn mul(&self, other: &Pose) -> Pose {
-        Pose { p: self.p + self.q * other.p, q: (self.q * other.q).normalize() }
+        Pose {
+            p: self.p + self.q * other.p,
+            q: (self.q * other.q).normalize(),
+        }
     }
     #[inline]
     pub fn inverse(&self) -> Pose {
         let qi = self.q.conjugate();
-        Pose { p: qi * -self.p, q: qi }
+        Pose {
+            p: qi * -self.p,
+            q: qi,
+        }
     }
     /// Pose of `other` expressed in this pose's frame (`self⁻¹ * other`).
     #[inline]
     pub fn inv_mul(&self, other: &Pose) -> Pose {
         let qi = self.q.conjugate();
-        Pose { p: qi * (other.p - self.p), q: (qi * other.q).normalize() }
+        Pose {
+            p: qi * (other.p - self.p),
+            q: (qi * other.q).normalize(),
+        }
     }
     pub fn to_mat4(&self) -> Mat4 {
         Mat4::from_rotation_translation(self.q, self.p)
@@ -66,7 +81,11 @@ impl Pose {
 /// Cross-product matrix: `skew(a) * b == a.cross(b)`.
 #[inline]
 pub fn skew(v: Vec3) -> Mat3 {
-    Mat3::from_cols(Vec3::new(0.0, v.z, -v.y), Vec3::new(-v.z, 0.0, v.x), Vec3::new(v.y, -v.x, 0.0))
+    Mat3::from_cols(
+        Vec3::new(0.0, v.z, -v.y),
+        Vec3::new(-v.z, 0.0, v.x),
+        Vec3::new(v.y, -v.x, 0.0),
+    )
 }
 
 /// Two unit vectors that complete `n` (unit) to a right-handed orthonormal basis.
@@ -86,7 +105,12 @@ pub fn orthonormal_basis(n: Vec3) -> (Vec3, Vec3) {
 #[inline]
 pub fn integrate_rotation(q: Quat, w: Vec3, h: f32) -> Quat {
     let dq = Quat::from_xyzw(w.x, w.y, w.z, 0.0) * q;
-    let r = Quat::from_xyzw(q.x + 0.5 * h * dq.x, q.y + 0.5 * h * dq.y, q.z + 0.5 * h * dq.z, q.w + 0.5 * h * dq.w);
+    let r = Quat::from_xyzw(
+        q.x + 0.5 * h * dq.x,
+        q.y + 0.5 * h * dq.y,
+        q.z + 0.5 * h * dq.z,
+        q.w + 0.5 * h * dq.w,
+    );
     r.normalize()
 }
 
@@ -132,7 +156,11 @@ pub fn closest_segment_segment(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3) -> (f32, 
         } else {
             let b = d1.dot(d2);
             let denom = a * e - b * b;
-            let mut s0 = if denom > EPS { ((b * f - c * e) / denom).clamp(0.0, 1.0) } else { 0.0 };
+            let mut s0 = if denom > EPS {
+                ((b * f - c * e) / denom).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
             let mut t0 = (b * s0 + f) / e;
             if t0 < 0.0 {
                 t0 = 0.0;
@@ -209,7 +237,13 @@ mod tests {
 
     #[test]
     fn basis_is_orthonormal() {
-        for n in [Vec3::X, Vec3::Y, Vec3::Z, -Vec3::Z, Vec3::new(1.0, 2.0, -3.0).normalize()] {
+        for n in [
+            Vec3::X,
+            Vec3::Y,
+            Vec3::Z,
+            -Vec3::Z,
+            Vec3::new(1.0, 2.0, -3.0).normalize(),
+        ] {
             let (a, b) = orthonormal_basis(n);
             assert!(a.dot(n).abs() < 1e-5 && b.dot(n).abs() < 1e-5 && a.dot(b).abs() < 1e-5);
             assert!((a.cross(b) - n).length() < 1e-4);
@@ -218,7 +252,10 @@ mod tests {
 
     #[test]
     fn pose_inverse_roundtrip() {
-        let p = Pose::new(Vec3::new(1.0, 2.0, 3.0), Quat::from_rotation_y(0.7) * Quat::from_rotation_x(0.3));
+        let p = Pose::new(
+            Vec3::new(1.0, 2.0, 3.0),
+            Quat::from_rotation_y(0.7) * Quat::from_rotation_x(0.3),
+        );
         let v = Vec3::new(-2.0, 0.5, 4.0);
         assert!((p.inverse_transform_point(p.transform_point(v)) - v).length() < 1e-5);
         let id = p.mul(&p.inverse());

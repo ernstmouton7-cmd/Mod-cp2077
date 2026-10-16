@@ -61,13 +61,24 @@ impl Default for BodyDesc {
 
 impl BodyDesc {
     pub fn dynamic(pose: Pose) -> Self {
-        Self { pose, ..Default::default() }
+        Self {
+            pose,
+            ..Default::default()
+        }
     }
     pub fn fixed(pose: Pose) -> Self {
-        Self { pose, body_type: BodyType::Static, ..Default::default() }
+        Self {
+            pose,
+            body_type: BodyType::Static,
+            ..Default::default()
+        }
     }
     pub fn kinematic(pose: Pose) -> Self {
-        Self { pose, body_type: BodyType::Kinematic, ..Default::default() }
+        Self {
+            pose,
+            body_type: BodyType::Kinematic,
+            ..Default::default()
+        }
     }
 }
 
@@ -174,7 +185,10 @@ pub struct CollisionFilter {
 
 impl Default for CollisionFilter {
     fn default() -> Self {
-        Self { memberships: 1, filter: u32::MAX }
+        Self {
+            memberships: 1,
+            filter: u32::MAX,
+        }
     }
 }
 
@@ -266,7 +280,10 @@ impl ColliderDesc {
         self
     }
     pub fn filter(mut self, memberships: u32, filter: u32) -> Self {
-        self.filter = CollisionFilter { memberships, filter };
+        self.filter = CollisionFilter {
+            memberships,
+            filter,
+        };
         self
     }
     pub fn sensor(mut self, s: bool) -> Self {

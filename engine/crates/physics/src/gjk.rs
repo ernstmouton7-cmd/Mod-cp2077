@@ -59,10 +59,18 @@ pub struct GjkResult {
 
 /// Closest points between two convex sets. `guess` seeds the search direction (any vector).
 pub fn gjk_distance<A: SupportMap, B: SupportMap>(a: &A, b: &B, guess: Vec3) -> GjkResult {
-    let d0 = if guess.length_squared() > 1e-12 { guess } else { Vec3::X };
+    let d0 = if guess.length_squared() > 1e-12 {
+        guess
+    } else {
+        Vec3::X
+    };
     let sa = a.support(-d0);
     let sb = b.support(d0);
-    let mut simplex = [SVert { w: sa - sb, a: sa, b: sb }; 4];
+    let mut simplex = [SVert {
+        w: sa - sb,
+        a: sa,
+        b: sb,
+    }; 4];
     let mut lambda = [1.0f32, 0.0, 0.0, 0.0];
     let mut n = 1usize;
     let mut v = sa - sb;
@@ -88,7 +96,11 @@ pub fn gjk_distance<A: SupportMap, B: SupportMap>(a: &A, b: &B, guess: Vec3) -> 
         if nn == 4 {
             return overlap_result(&nv, &nl, nn);
         }
-        let new_v = nv[..nn].iter().zip(&nl[..nn]).map(|(s, l)| s.w * *l).sum::<Vec3>();
+        let new_v = nv[..nn]
+            .iter()
+            .zip(&nl[..nn])
+            .map(|(s, l)| s.w * *l)
+            .sum::<Vec3>();
         if new_v.length_squared() >= dist2 * (1.0 - 1e-6) {
             // No progress (numerical stall): keep the previous simplex.
             break;
@@ -98,20 +110,54 @@ pub fn gjk_distance<A: SupportMap, B: SupportMap>(a: &A, b: &B, guess: Vec3) -> 
         n = nn;
         v = new_v;
     }
-    let pa = simplex[..n].iter().zip(&lambda[..n]).map(|(s, l)| s.a * *l).sum::<Vec3>();
-    let pb = simplex[..n].iter().zip(&lambda[..n]).map(|(s, l)| s.b * *l).sum::<Vec3>();
+    let pa = simplex[..n]
+        .iter()
+        .zip(&lambda[..n])
+        .map(|(s, l)| s.a * *l)
+        .sum::<Vec3>();
+    let pb = simplex[..n]
+        .iter()
+        .zip(&lambda[..n])
+        .map(|(s, l)| s.b * *l)
+        .sum::<Vec3>();
     let d = pb - pa;
     let dist = d.length();
     if dist < 1e-7 {
-        return GjkResult { distance: 0.0, point_a: pa, point_b: pb, normal: Vec3::Y, overlap: true };
+        return GjkResult {
+            distance: 0.0,
+            point_a: pa,
+            point_b: pb,
+            normal: Vec3::Y,
+            overlap: true,
+        };
     }
-    GjkResult { distance: dist, point_a: pa, point_b: pb, normal: d / dist, overlap: false }
+    GjkResult {
+        distance: dist,
+        point_a: pa,
+        point_b: pb,
+        normal: d / dist,
+        overlap: false,
+    }
 }
 
 fn overlap_result(s: &[SVert; 4], l: &[f32; 4], n: usize) -> GjkResult {
-    let pa = s[..n].iter().zip(&l[..n]).map(|(s, l)| s.a * *l).sum::<Vec3>();
-    let pb = s[..n].iter().zip(&l[..n]).map(|(s, l)| s.b * *l).sum::<Vec3>();
-    GjkResult { distance: 0.0, point_a: pa, point_b: pb, normal: Vec3::Y, overlap: true }
+    let pa = s[..n]
+        .iter()
+        .zip(&l[..n])
+        .map(|(s, l)| s.a * *l)
+        .sum::<Vec3>();
+    let pb = s[..n]
+        .iter()
+        .zip(&l[..n])
+        .map(|(s, l)| s.b * *l)
+        .sum::<Vec3>();
+    GjkResult {
+        distance: 0.0,
+        point_a: pa,
+        point_b: pb,
+        normal: Vec3::Y,
+        overlap: true,
+    }
 }
 
 /// Closest point of the simplex to the origin. Returns the reduced simplex and its weights.
@@ -268,7 +314,14 @@ pub struct CastHit {
 }
 
 /// Sweep convex `a` (inflated by `ra`) along unit `dir` against `b` (inflated by `rb`).
-pub fn shape_cast<A: SupportMap, B: SupportMap>(a: &A, ra: f32, b: &B, rb: f32, dir: Vec3, max_t: f32) -> Option<CastHit> {
+pub fn shape_cast<A: SupportMap, B: SupportMap>(
+    a: &A,
+    ra: f32,
+    b: &B,
+    rb: f32,
+    dir: Vec3,
+    max_t: f32,
+) -> Option<CastHit> {
     let margin = ra + rb;
     let mut t = 0.0f32;
     let mut guess = dir;
@@ -276,12 +329,24 @@ pub fn shape_cast<A: SupportMap, B: SupportMap>(a: &A, ra: f32, b: &B, rb: f32, 
         let moved = Translated(a, dir * t);
         let g = gjk_distance(&moved, b, guess);
         if g.overlap {
-            return if t == 0.0 { Some(CastHit { t: 0.0, point: g.point_b, normal: -dir }) } else { None };
+            return if t == 0.0 {
+                Some(CastHit {
+                    t: 0.0,
+                    point: g.point_b,
+                    normal: -dir,
+                })
+            } else {
+                None
+            };
         }
         let gap = g.distance - margin;
         let n_ba = -g.normal; // from B toward A
         if gap < 1e-3 {
-            return Some(CastHit { t, point: g.point_b + n_ba * rb, normal: n_ba });
+            return Some(CastHit {
+                t,
+                point: g.point_b + n_ba * rb,
+                normal: n_ba,
+            });
         }
         let closing = dir.dot(g.normal);
         if closing <= 1e-6 {
@@ -303,7 +368,13 @@ mod tests {
     fn cube(c: Vec3, h: f32) -> Vec<Vec3> {
         let mut v = Vec::new();
         for i in 0..8 {
-            v.push(c + Vec3::new(if i & 1 == 0 { -h } else { h }, if i & 2 == 0 { -h } else { h }, if i & 4 == 0 { -h } else { h }));
+            v.push(
+                c + Vec3::new(
+                    if i & 1 == 0 { -h } else { h },
+                    if i & 2 == 0 { -h } else { h },
+                    if i & 4 == 0 { -h } else { h },
+                ),
+            );
         }
         v
     }
@@ -330,7 +401,10 @@ mod tests {
         let seg = [Vec3::new(-1.0, 0.0, 0.0), Vec3::new(1.0, 0.0, 0.0)];
         let p = [Vec3::new(0.3, 2.0, 0.0)];
         let r = gjk_distance(&PointSet(&p), &PointSet(&seg), Vec3::Y);
-        assert!((r.distance - 2.0).abs() < 1e-5 && (r.point_b - Vec3::new(0.3, 0.0, 0.0)).length() < 1e-5);
+        assert!(
+            (r.distance - 2.0).abs() < 1e-5
+                && (r.point_b - Vec3::new(0.3, 0.0, 0.0)).length() < 1e-5
+        );
         let c = cube(Vec3::ZERO, 1.0);
         let q = [Vec3::new(2.0, 2.0, 2.0)];
         let r2 = gjk_distance(&PointSet(&q), &PointSet(&c), Vec3::X);

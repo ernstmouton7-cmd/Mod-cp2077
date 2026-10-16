@@ -64,11 +64,32 @@ pub struct Contact {
 /// Something that happened during the last step.
 #[derive(Clone, Copy, Debug)]
 pub enum PhysicsEvent {
-    ContactBegin { a: ColliderHandle, b: ColliderHandle, sensor: bool },
-    ContactEnd { a: ColliderHandle, b: ColliderHandle, sensor: bool },
+    ContactBegin {
+        a: ColliderHandle,
+        b: ColliderHandle,
+        sensor: bool,
+    },
+    ContactEnd {
+        a: ColliderHandle,
+        b: ColliderHandle,
+        sensor: bool,
+    },
     /// A collision with a noticeable approach speed (for damage, sounds, rumble, particles).
-    Impact { a: ColliderHandle, b: ColliderHandle, body_a: BodyHandle, body_b: BodyHandle, point: Vec3, normal: Vec3, impulse: f32, speed: f32 },
-    JointBroken { joint: JointHandle, body_a: BodyHandle, body_b: BodyHandle },
+    Impact {
+        a: ColliderHandle,
+        b: ColliderHandle,
+        body_a: BodyHandle,
+        body_b: BodyHandle,
+        point: Vec3,
+        normal: Vec3,
+        impulse: f32,
+        speed: f32,
+    },
+    JointBroken {
+        joint: JointHandle,
+        body_a: BodyHandle,
+        body_b: BodyHandle,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -193,7 +214,11 @@ impl PhysicsWorld {
     }
 
     /// Convenience: a body with one collider.
-    pub fn add_body_with(&mut self, desc: BodyDesc, collider: ColliderDesc) -> (BodyHandle, ColliderHandle) {
+    pub fn add_body_with(
+        &mut self,
+        desc: BodyDesc,
+        collider: ColliderDesc,
+    ) -> (BodyHandle, ColliderHandle) {
         let b = self.add_body(desc);
         let c = self.add_collider(b, collider);
         (b, c)
@@ -214,7 +239,9 @@ impl PhysicsWorld {
     }
 
     pub fn remove_body(&mut self, h: BodyHandle) {
-        let Some(body) = self.bodies.get(h.0) else { return };
+        let Some(body) = self.bodies.get(h.0) else {
+            return;
+        };
         let colliders = body.colliders.clone();
         self.wake_neighbours(h);
         for c in colliders {
@@ -280,7 +307,9 @@ impl PhysicsWorld {
     }
 
     fn update_mass(&mut self, h: BodyHandle) {
-        let Some(b) = self.bodies.get(h.0) else { return };
+        let Some(b) = self.bodies.get(h.0) else {
+            return;
+        };
         let mp = if let Some(m) = b.mass_override {
             m
         } else {
@@ -295,10 +324,26 @@ impl PhysicsWorld {
         };
         let b = self.bodies.get_mut(h.0).unwrap();
         if b.body_type != BodyType::Dynamic || mp.mass <= 0.0 {
-            b.mass = if b.body_type == BodyType::Dynamic { 1.0 } else { 0.0 };
-            b.inv_mass = if b.body_type == BodyType::Dynamic { 1.0 } else { 0.0 };
-            b.local_com = if b.body_type == BodyType::Dynamic { mp.com } else { Vec3::ZERO };
-            b.inertia = if b.body_type == BodyType::Dynamic { Mat3::IDENTITY } else { Mat3::ZERO };
+            b.mass = if b.body_type == BodyType::Dynamic {
+                1.0
+            } else {
+                0.0
+            };
+            b.inv_mass = if b.body_type == BodyType::Dynamic {
+                1.0
+            } else {
+                0.0
+            };
+            b.local_com = if b.body_type == BodyType::Dynamic {
+                mp.com
+            } else {
+                Vec3::ZERO
+            };
+            b.inertia = if b.body_type == BodyType::Dynamic {
+                Mat3::IDENTITY
+            } else {
+                Mat3::ZERO
+            };
             b.inv_inertia_local = b.inertia;
             return;
         }
@@ -335,7 +380,11 @@ impl PhysicsWorld {
         };
         let h = ColliderHandle(self.colliders.insert(c));
         let fat = aabb.expanded(if is_static { 0.0 } else { AABB_MARGIN });
-        let tree = if is_static { &mut self.static_tree } else { &mut self.dynamic_tree };
+        let tree = if is_static {
+            &mut self.static_tree
+        } else {
+            &mut self.dynamic_tree
+        };
         let proxy = tree.insert(fat, h.0.index);
         self.colliders[h.0].proxy = proxy;
         self.bodies[body.0].colliders.push(h);
@@ -360,7 +409,9 @@ impl PhysicsWorld {
     }
 
     fn remove_collider_inner(&mut self, h: ColliderHandle, update_body: bool) {
-        let Some(c) = self.colliders.get(h.0) else { return };
+        let Some(c) = self.colliders.get(h.0) else {
+            return;
+        };
         let (proxy, st, body) = (c.proxy, c.is_static_tree, c.body);
         if st {
             self.static_tree.remove(proxy);
@@ -368,7 +419,11 @@ impl PhysicsWorld {
             self.dynamic_tree.remove(proxy);
         }
         // Destroy contacts involving this collider.
-        let contacts: Vec<Handle> = self.body_contacts.get(body.0.index as usize).map(|v| v.to_vec()).unwrap_or_default();
+        let contacts: Vec<Handle> = self
+            .body_contacts
+            .get(body.0.index as usize)
+            .map(|v| v.to_vec())
+            .unwrap_or_default();
         for ch in contacts {
             if let Some(ct) = self.contacts.get(ch) {
                 if ct.collider_a == h || ct.collider_b == h {
@@ -387,7 +442,9 @@ impl PhysicsWorld {
     }
 
     fn refresh_collider(&mut self, h: ColliderHandle, force_move: bool) {
-        let Some(c) = self.colliders.get(h.0) else { return };
+        let Some(c) = self.colliders.get(h.0) else {
+            return;
+        };
         let b = &self.bodies[c.body.0];
         let world = b.pose.mul(&c.local);
         let aabb = c.shape.aabb(&world);
@@ -414,7 +471,10 @@ impl PhysicsWorld {
         self.body_joints[a.0.index as usize].push(h.0);
         self.body_joints[b.0.index as usize].push(h.0);
         if !cc {
-            *self.no_collide_pairs.entry(pair_key(a.0.index, b.0.index)).or_insert(0) += 1;
+            *self
+                .no_collide_pairs
+                .entry(pair_key(a.0.index, b.0.index))
+                .or_insert(0) += 1;
             // Drop existing contacts between the two bodies.
             let cs: Vec<Handle> = self.body_contacts[a.0.index as usize].to_vec();
             for ch in cs {
@@ -438,7 +498,9 @@ impl PhysicsWorld {
     }
 
     pub fn remove_joint(&mut self, h: JointHandle) {
-        let Some(j) = self.joints.remove(h.0) else { return };
+        let Some(j) = self.joints.remove(h.0) else {
+            return;
+        };
         let (a, b) = (j.desc.body_a, j.desc.body_b);
         for body in [a, b] {
             if let Some(list) = self.body_joints.get_mut(body.0.index as usize) {
@@ -462,7 +524,9 @@ impl PhysicsWorld {
 
     /// Wake a body and everything resting on or jointed to it.
     pub fn wake(&mut self, h: BodyHandle) {
-        let Some(b) = self.bodies.get_mut(h.0) else { return };
+        let Some(b) = self.bodies.get_mut(h.0) else {
+            return;
+        };
         if b.is_static() {
             return;
         }
@@ -473,7 +537,9 @@ impl PhysicsWorld {
         let mut stack: SmallVec<[BodyHandle; 16]> = SmallVec::new();
         stack.push(h);
         while let Some(x) = stack.pop() {
-            let Some(b) = self.bodies.get_mut(x.0) else { continue };
+            let Some(b) = self.bodies.get_mut(x.0) else {
+                continue;
+            };
             if !b.sleeping {
                 continue;
             }
@@ -491,7 +557,11 @@ impl PhysicsWorld {
             }
             for jh in &self.body_joints[x.0.index as usize] {
                 if let Some(j) = self.joints.get(*jh) {
-                    let o = if j.desc.body_a == x { j.desc.body_b } else { j.desc.body_a };
+                    let o = if j.desc.body_a == x {
+                        j.desc.body_b
+                    } else {
+                        j.desc.body_a
+                    };
                     if self.bodies.get(o.0).is_some_and(|ob| ob.sleeping) {
                         stack.push(o);
                     }
@@ -513,12 +583,30 @@ impl PhysicsWorld {
     // ---------------------------------------------------------------- queries
 
     pub fn query(&self) -> QueryView<'_> {
-        QueryView { colliders: &self.colliders, bodies: &self.bodies, static_tree: &self.static_tree, dynamic_tree: &self.dynamic_tree }
+        QueryView {
+            colliders: &self.colliders,
+            bodies: &self.bodies,
+            static_tree: &self.static_tree,
+            dynamic_tree: &self.dynamic_tree,
+        }
     }
-    pub fn ray_cast(&self, origin: Vec3, dir: Vec3, max_t: f32, filter: &QueryFilter) -> Option<RayHit> {
+    pub fn ray_cast(
+        &self,
+        origin: Vec3,
+        dir: Vec3,
+        max_t: f32,
+        filter: &QueryFilter,
+    ) -> Option<RayHit> {
         self.query().ray_cast(origin, dir, max_t, filter)
     }
-    pub fn sphere_cast(&self, center: Vec3, radius: f32, dir: Vec3, max_t: f32, filter: &QueryFilter) -> Option<RayHit> {
+    pub fn sphere_cast(
+        &self,
+        center: Vec3,
+        radius: f32,
+        dir: Vec3,
+        max_t: f32,
+        filter: &QueryFilter,
+    ) -> Option<RayHit> {
         self.query().sphere_cast(center, radius, dir, max_t, filter)
     }
 
@@ -530,7 +618,11 @@ impl PhysicsWorld {
         self.contacts.iter().map(|(_, c)| c)
     }
     pub fn contacts_of(&self, b: BodyHandle) -> impl Iterator<Item = &Contact> {
-        self.body_contacts.get(b.0.index as usize).into_iter().flatten().filter_map(|h| self.contacts.get(*h))
+        self.body_contacts
+            .get(b.0.index as usize)
+            .into_iter()
+            .flatten()
+            .filter_map(|h| self.contacts.get(*h))
     }
 
     // ---------------------------------------------------------------- step
@@ -544,6 +636,9 @@ impl PhysicsWorld {
         for (_, b) in self.bodies.iter_mut() {
             b.prev_pose = b.pose;
         }
+        if !self.vehicles.is_empty() {
+            self.vehicles_pre_step(dt);
+        }
         self.update_broadphase(dt);
         self.find_pairs();
         let t1 = std::time::Instant::now();
@@ -551,6 +646,9 @@ impl PhysicsWorld {
         let t2 = std::time::Instant::now();
         self.solve(dt);
         self.finish_step(dt);
+        if !self.vehicles.is_empty() {
+            self.vehicles_post_step(dt);
+        }
         let t3 = std::time::Instant::now();
         self.stats.broadphase_us = (t1 - t0).as_secs_f32() * 1e6;
         self.stats.narrowphase_us = (t2 - t1).as_secs_f32() * 1e6;
@@ -589,9 +687,19 @@ impl PhysicsWorld {
             if !seen.insert(ci) {
                 continue;
             }
-            let Some((_, c)) = self.colliders.get_index(ci) else { continue };
-            let fat = if c.is_static_tree { self.static_tree.fat_aabb(c.proxy) } else { self.dynamic_tree.fat_aabb(c.proxy) };
-            let trees: &[&DynamicTree] = if c.is_static_tree { &[&self.dynamic_tree] } else { &[&self.static_tree, &self.dynamic_tree] };
+            let Some((_, c)) = self.colliders.get_index(ci) else {
+                continue;
+            };
+            let fat = if c.is_static_tree {
+                self.static_tree.fat_aabb(c.proxy)
+            } else {
+                self.dynamic_tree.fat_aabb(c.proxy)
+            };
+            let trees: &[&DynamicTree] = if c.is_static_tree {
+                &[&self.dynamic_tree]
+            } else {
+                &[&self.static_tree, &self.dynamic_tree]
+            };
             for tree in trees {
                 tree.query(&fat, |proxy| {
                     let other = tree.data(proxy);
@@ -608,17 +716,27 @@ impl PhysicsWorld {
             if self.pair_map.contains_key(&(a, b)) {
                 continue;
             }
-            let (Some((ha, ca)), Some((hb, cb))) = (self.colliders.get_index(a), self.colliders.get_index(b)) else { continue };
+            let (Some((ha, ca)), Some((hb, cb))) =
+                (self.colliders.get_index(a), self.colliders.get_index(b))
+            else {
+                continue;
+            };
             if ca.body == cb.body || !ca.filter.test(&cb.filter) {
                 continue;
             }
             let (ba, bb) = (&self.bodies[ca.body.0], &self.bodies[cb.body.0]);
             // At least one side must be dynamic (or a sensor watching a moving body).
             let sensor = ca.sensor || cb.sensor;
-            if !ba.is_dynamic() && !bb.is_dynamic() && !(sensor && (!ba.is_static() || !bb.is_static())) {
+            if !ba.is_dynamic()
+                && !bb.is_dynamic()
+                && !(sensor && (!ba.is_static() || !bb.is_static()))
+            {
                 continue;
             }
-            if self.no_collide_pairs.contains_key(&pair_key(ca.body.0.index, cb.body.0.index)) {
+            if self
+                .no_collide_pairs
+                .contains_key(&pair_key(ca.body.0.index, cb.body.0.index))
+            {
                 continue;
             }
             let contact = Contact {
@@ -629,7 +747,11 @@ impl PhysicsWorld {
                 manifolds: SmallVec::new(),
                 friction: (ca.friction * cb.friction).sqrt(),
                 restitution: ca.restitution.max(cb.restitution),
-                rolling: ca.rolling_resistance.max(cb.rolling_resistance) * ca.shape.bounding_radius().min(cb.shape.bounding_radius()).min(1.0),
+                rolling: ca.rolling_resistance.max(cb.rolling_resistance)
+                    * ca.shape
+                        .bounding_radius()
+                        .min(cb.shape.bounding_radius())
+                        .min(1.0),
                 touching: false,
                 sensor,
             };
@@ -642,7 +764,9 @@ impl PhysicsWorld {
     }
 
     fn destroy_contact(&mut self, h: Handle) {
-        let Some(c) = self.contacts.remove(h) else { return };
+        let Some(c) = self.contacts.remove(h) else {
+            return;
+        };
         let key = pair_key(c.collider_a.0.index, c.collider_b.0.index);
         self.pair_map.remove(&key);
         for b in [c.body_a, c.body_b] {
@@ -653,7 +777,11 @@ impl PhysicsWorld {
             }
         }
         if c.touching {
-            self.events.push(PhysicsEvent::ContactEnd { a: c.collider_a, b: c.collider_b, sensor: c.sensor });
+            self.events.push(PhysicsEvent::ContactEnd {
+                a: c.collider_a,
+                b: c.collider_b,
+                sensor: c.sensor,
+            });
         }
     }
 
@@ -664,7 +792,10 @@ impl PhysicsWorld {
         let mut geom = std::mem::take(&mut self.geom);
         for h in handles {
             let c = &self.contacts[h];
-            let (Some(ca), Some(cb)) = (self.colliders.get(c.collider_a.0), self.colliders.get(c.collider_b.0)) else {
+            let (Some(ca), Some(cb)) = (
+                self.colliders.get(c.collider_a.0),
+                self.colliders.get(c.collider_b.0),
+            ) else {
                 to_destroy.push(h);
                 continue;
             };
@@ -675,8 +806,16 @@ impl PhysicsWorld {
             if !a_active && !b_active {
                 continue;
             }
-            let fat_a = if ca.is_static_tree { self.static_tree.fat_aabb(ca.proxy) } else { self.dynamic_tree.fat_aabb(ca.proxy) };
-            let fat_b = if cb.is_static_tree { self.static_tree.fat_aabb(cb.proxy) } else { self.dynamic_tree.fat_aabb(cb.proxy) };
+            let fat_a = if ca.is_static_tree {
+                self.static_tree.fat_aabb(ca.proxy)
+            } else {
+                self.dynamic_tree.fat_aabb(ca.proxy)
+            };
+            let fat_b = if cb.is_static_tree {
+                self.static_tree.fat_aabb(cb.proxy)
+            } else {
+                self.dynamic_tree.fat_aabb(cb.proxy)
+            };
             if !fat_a.overlaps(&fat_b) {
                 to_destroy.push(h);
                 continue;
@@ -690,7 +829,9 @@ impl PhysicsWorld {
             if c.sensor {
                 collide(&ca.shape, &ca.world, &cb.shape, &cb.world, 0.0, &mut geom);
             } else {
-                collide(&ca.shape, &ca.world, &cb.shape, &cb.world, margin, &mut geom);
+                collide(
+                    &ca.shape, &ca.world, &cb.shape, &cb.world, margin, &mut geom,
+                );
             }
             let (pose_a, pose_b) = (ba.pose, bb.pose);
             let was_touching = c.touching;
@@ -699,12 +840,22 @@ impl PhysicsWorld {
             let old = std::mem::take(&mut c.manifolds);
             let mut touching = false;
             for g in &geom {
-                let mut m = Manifold { normal: g.normal, points: SmallVec::new(), key: g.key };
+                let mut m = Manifold {
+                    normal: g.normal,
+                    points: SmallVec::new(),
+                    key: g.key,
+                };
                 let prev = old.iter().find(|o| o.key == g.key);
                 for p in &g.points {
                     let la = pose_a.inverse_transform_point(p.pa);
                     let lb = pose_b.inverse_transform_point(p.pb);
-                    let mut mp = ManifoldPoint { local_a: la, local_b: lb, point: (p.pa + p.pb) * 0.5, separation: p.separation, ..Default::default() };
+                    let mut mp = ManifoldPoint {
+                        local_a: la,
+                        local_b: lb,
+                        point: (p.pa + p.pb) * 0.5,
+                        separation: p.separation,
+                        ..Default::default()
+                    };
                     if p.separation < 0.0 + 0.005 {
                         touching = true;
                     }
@@ -712,7 +863,10 @@ impl PhysicsWorld {
                         // Warm start from the nearest matching old point.
                         let mut best = 0.05f32 * 0.05;
                         for op in &prev.points {
-                            let d = op.local_a.distance_squared(la).min(op.local_b.distance_squared(lb));
+                            let d = op
+                                .local_a
+                                .distance_squared(la)
+                                .min(op.local_b.distance_squared(lb));
                             if d < best {
                                 best = d;
                                 mp.normal_impulse = op.normal_impulse;
@@ -732,7 +886,11 @@ impl PhysicsWorld {
             c.touching = touching;
             if touching != was_touching {
                 let (a, b) = (c.collider_a, c.collider_b);
-                self.events.push(if touching { PhysicsEvent::ContactBegin { a, b, sensor } } else { PhysicsEvent::ContactEnd { a, b, sensor } });
+                self.events.push(if touching {
+                    PhysicsEvent::ContactBegin { a, b, sensor }
+                } else {
+                    PhysicsEvent::ContactEnd { a, b, sensor }
+                });
                 if touching && !sensor {
                     if !a_active {
                         to_wake.push(c.body_a);
@@ -774,8 +932,16 @@ impl PhysicsWorld {
                 c: b.com(),
                 q: b.pose.q,
                 inv_mass: if dynamic { b.inv_mass } else { 0.0 },
-                inv_i: if dynamic { r * b.inv_inertia_local * r.transpose() } else { Mat3::ZERO },
-                inv_i_local: if dynamic { b.inv_inertia_local } else { Mat3::ZERO },
+                inv_i: if dynamic {
+                    r * b.inv_inertia_local * r.transpose()
+                } else {
+                    Mat3::ZERO
+                },
+                inv_i_local: if dynamic {
+                    b.inv_inertia_local
+                } else {
+                    Mat3::ZERO
+                },
                 local_com: b.local_com,
                 force: b.force,
                 torque: b.torque,
@@ -796,7 +962,11 @@ impl PhysicsWorld {
             sb.push(make(b, bh.index, true));
             awake += 1;
         }
-        let ensure = |sb: &mut Vec<SolverBody>, solver_of: &mut Vec<u32>, bh: BodyHandle, bodies: &Arena<RigidBody>| -> u32 {
+        let ensure = |sb: &mut Vec<SolverBody>,
+                      solver_of: &mut Vec<u32>,
+                      bh: BodyHandle,
+                      bodies: &Arena<RigidBody>|
+         -> u32 {
             let i = solver_of[bh.0.index as usize];
             if i != u32::MAX {
                 return i;
@@ -811,9 +981,21 @@ impl PhysicsWorld {
         // Contact constraints.
         let mut constraints = std::mem::take(&mut self.constraints);
         constraints.clear();
-        let soft = Softness::new(cfg.contact_hertz.min(0.25 / h), cfg.contact_damping_ratio, h);
-        let static_soft = Softness::new((2.0 * cfg.contact_hertz).min(0.25 / h), cfg.contact_damping_ratio, h);
-        let joint_soft = Softness::new((2.0 * cfg.contact_hertz).min(cfg.joint_hertz).min(0.25 / h), cfg.joint_damping_ratio, h);
+        let soft = Softness::new(
+            cfg.contact_hertz.min(0.25 / h),
+            cfg.contact_damping_ratio,
+            h,
+        );
+        let static_soft = Softness::new(
+            (2.0 * cfg.contact_hertz).min(0.25 / h),
+            cfg.contact_damping_ratio,
+            h,
+        );
+        let joint_soft = Softness::new(
+            (2.0 * cfg.contact_hertz).min(cfg.joint_hertz).min(0.25 / h),
+            cfg.joint_damping_ratio,
+            h,
+        );
         let mut world_pts: SmallVec<[(Vec3, f32); 4]> = SmallVec::new();
         let mut touching = 0;
         for (chh, c) in self.contacts.iter() {
@@ -849,7 +1031,11 @@ impl PhysicsWorld {
                 };
                 world_pts.clear();
                 for p in &m.points {
-                    cc.points.push(ConstraintPoint { normal_impulse: p.normal_impulse, tangent_impulse: p.tangent_impulse, ..Default::default() });
+                    cc.points.push(ConstraintPoint {
+                        normal_impulse: p.normal_impulse,
+                        tangent_impulse: p.tangent_impulse,
+                        ..Default::default()
+                    });
                     world_pts.push((p.point, p.separation));
                 }
                 prepare_contact(&mut cc, &sb, &world_pts, h, &cfg, static_soft, soft);
@@ -885,7 +1071,12 @@ impl PhysicsWorld {
             integrate_velocities(&mut sb, self.gravity, h, &cfg);
             if !self.vehicles.is_empty() {
                 let mut ctx = SubstepContext {
-                    query: QueryView { colliders: &self.colliders, bodies: &self.bodies, static_tree: &self.static_tree, dynamic_tree: &self.dynamic_tree },
+                    query: QueryView {
+                        colliders: &self.colliders,
+                        bodies: &self.bodies,
+                        static_tree: &self.static_tree,
+                        dynamic_tree: &self.dynamic_tree,
+                    },
                     bodies: &mut sb,
                     solver_of: &self.solver_of,
                     h,
@@ -922,7 +1113,9 @@ impl PhysicsWorld {
 
         // Store impulses and emit impacts.
         for cc in &constraints {
-            let Some(c) = self.contacts.get_index(cc.source.0).map(|(h, _)| h) else { continue };
+            let Some(c) = self.contacts.get_index(cc.source.0).map(|(h, _)| h) else {
+                continue;
+            };
             let contact = &mut self.contacts[c];
             let m = &mut contact.manifolds[cc.source.1 as usize];
             let mut max_speed = 0.0f32;
@@ -959,10 +1152,18 @@ impl PhysicsWorld {
             if j.finish(h) {
                 j.broken = true;
                 let (a, b) = (j.desc.body_a, j.desc.body_b);
-                self.events.push(PhysicsEvent::JointBroken { joint: JointHandle(jh), body_a: a, body_b: b });
+                self.events.push(PhysicsEvent::JointBroken {
+                    joint: JointHandle(jh),
+                    body_a: a,
+                    body_b: b,
+                });
             }
         }
-        let broken: SmallVec<[Handle; 4]> = active_joints.iter().copied().filter(|j| self.joints[*j].broken).collect();
+        let broken: SmallVec<[Handle; 4]> = active_joints
+            .iter()
+            .copied()
+            .filter(|j| self.joints[*j].broken)
+            .collect();
         for j in broken {
             self.remove_joint(JointHandle(j));
         }
@@ -972,7 +1173,9 @@ impl PhysicsWorld {
             if !s.dynamic && !s.kinematic {
                 continue;
             }
-            let Some((bh, _)) = self.bodies.get_index(s.body_index) else { continue };
+            let Some((bh, _)) = self.bodies.get_index(s.body_index) else {
+                continue;
+            };
             let b = &mut self.bodies[bh];
             b.lin_vel = s.v;
             b.ang_vel = s.w;
@@ -1007,7 +1210,10 @@ impl PhysicsWorld {
             if !b.is_dynamic() || b.sleeping {
                 continue;
             }
-            if b.can_sleep && b.lin_vel.length_squared() < SLEEP_LINEAR * SLEEP_LINEAR && b.ang_vel.length_squared() < SLEEP_ANGULAR * SLEEP_ANGULAR {
+            if b.can_sleep
+                && b.lin_vel.length_squared() < SLEEP_LINEAR * SLEEP_LINEAR
+                && b.ang_vel.length_squared() < SLEEP_ANGULAR * SLEEP_ANGULAR
+            {
                 b.sleep_time += dt;
             } else {
                 b.sleep_time = 0.0;
@@ -1035,13 +1241,18 @@ impl PhysicsWorld {
             let ba = &self.bodies[c.body_a.0];
             let bb = &self.bodies[c.body_b.0];
             if ba.is_dynamic() && bb.is_dynamic() {
-                let (ra, rb) = (find(&mut parent, c.body_a.0.index), find(&mut parent, c.body_b.0.index));
+                let (ra, rb) = (
+                    find(&mut parent, c.body_a.0.index),
+                    find(&mut parent, c.body_b.0.index),
+                );
                 parent[ra as usize] = rb;
             } else {
                 // Touching a moving kinematic body prevents sleep.
                 for (me, other) in [(ba, bb), (bb, ba)] {
                     let _ = me;
-                    if other.body_type == BodyType::Kinematic && (other.lin_vel != Vec3::ZERO || other.ang_vel != Vec3::ZERO) {
+                    if other.body_type == BodyType::Kinematic
+                        && (other.lin_vel != Vec3::ZERO || other.ang_vel != Vec3::ZERO)
+                    {
                         keep_awake[c.body_a.0.index as usize] = true;
                         keep_awake[c.body_b.0.index as usize] = true;
                     }
@@ -1050,7 +1261,9 @@ impl PhysicsWorld {
         }
         for (_, j) in self.joints.iter() {
             let (a, b) = (j.desc.body_a.0.index, j.desc.body_b.0.index);
-            if self.bodies[j.desc.body_a.0].is_dynamic() && self.bodies[j.desc.body_b.0].is_dynamic() {
+            if self.bodies[j.desc.body_a.0].is_dynamic()
+                && self.bodies[j.desc.body_b.0].is_dynamic()
+            {
                 let (ra, rb) = (find(&mut parent, a), find(&mut parent, b));
                 parent[ra as usize] = rb;
             }
@@ -1061,7 +1274,11 @@ impl PhysicsWorld {
                 continue;
             }
             let r = find(&mut parent, bh.index) as usize;
-            let t = if !b.can_sleep || keep_awake[bh.index as usize] { 0.0 } else { b.sleep_time };
+            let t = if !b.can_sleep || keep_awake[bh.index as usize] {
+                0.0
+            } else {
+                b.sleep_time
+            };
             min_sleep[r] = min_sleep[r].min(t);
         }
         // Vehicles with throttle input never sleep.

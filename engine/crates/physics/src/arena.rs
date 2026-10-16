@@ -7,7 +7,10 @@ pub struct Handle {
 }
 
 impl Handle {
-    pub const INVALID: Handle = Handle { index: u32::MAX, generation: 0 };
+    pub const INVALID: Handle = Handle {
+        index: u32::MAX,
+        generation: 0,
+    };
 }
 
 #[derive(Clone, Debug)]
@@ -25,7 +28,11 @@ pub struct Arena<T> {
 
 impl<T> Default for Arena<T> {
     fn default() -> Self {
-        Self { slots: Vec::new(), free_head: u32::MAX, len: 0 }
+        Self {
+            slots: Vec::new(),
+            free_head: u32::MAX,
+            len: 0,
+        }
     }
 }
 
@@ -57,7 +64,10 @@ impl<T> Arena<T> {
             unreachable!()
         }
         self.slots.push(Slot::Occupied(0, value));
-        Handle { index: (self.slots.len() - 1) as u32, generation: 0 }
+        Handle {
+            index: (self.slots.len() - 1) as u32,
+            generation: 0,
+        }
     }
 
     pub fn remove(&mut self, h: Handle) -> Option<T> {
@@ -94,7 +104,13 @@ impl<T> Arena<T> {
     #[inline]
     pub fn get_index(&self, index: u32) -> Option<(Handle, &T)> {
         match self.slots.get(index as usize) {
-            Some(Slot::Occupied(g, v)) => Some((Handle { index, generation: *g }, v)),
+            Some(Slot::Occupied(g, v)) => Some((
+                Handle {
+                    index,
+                    generation: *g,
+                },
+                v,
+            )),
             _ => None,
         }
     }
@@ -105,15 +121,30 @@ impl<T> Arena<T> {
 
     pub fn iter(&self) -> impl Iterator<Item = (Handle, &T)> {
         self.slots.iter().enumerate().filter_map(|(i, s)| match s {
-            Slot::Occupied(g, v) => Some((Handle { index: i as u32, generation: *g }, v)),
+            Slot::Occupied(g, v) => Some((
+                Handle {
+                    index: i as u32,
+                    generation: *g,
+                },
+                v,
+            )),
             _ => None,
         })
     }
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (Handle, &mut T)> {
-        self.slots.iter_mut().enumerate().filter_map(|(i, s)| match s {
-            Slot::Occupied(g, v) => Some((Handle { index: i as u32, generation: *g }, v)),
-            _ => None,
-        })
+        self.slots
+            .iter_mut()
+            .enumerate()
+            .filter_map(|(i, s)| match s {
+                Slot::Occupied(g, v) => Some((
+                    Handle {
+                        index: i as u32,
+                        generation: *g,
+                    },
+                    v,
+                )),
+                _ => None,
+            })
     }
     pub fn handles(&self) -> Vec<Handle> {
         self.iter().map(|(h, _)| h).collect()
