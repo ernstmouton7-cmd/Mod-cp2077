@@ -254,7 +254,9 @@ fn run(args: Args) -> Result<bool, String> {
         .map(|j| {
             let mut p = j.dest.clone().into_os_string();
             p.push(".part");
-            std::fs::metadata(p).map(|m| m.len().min(j.file.size)).unwrap_or(0)
+            std::fs::metadata(p)
+                .map(|m| m.len().min(j.file.size))
+                .unwrap_or(0)
         })
         .sum();
     let bytes = AtomicU64::new(resumed);
