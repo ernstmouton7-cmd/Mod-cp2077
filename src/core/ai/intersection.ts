@@ -16,6 +16,8 @@ export class JunctionState {
   yellow: "stop" | "go" | undefined = undefined;
   /** Decided to run this red light. */
   redRun = false;
+  /** The run-or-stop decision for this red has been made (rolled once). */
+  redDecided = false;
   /** Came to a complete stop at the line (stop signs, right on red). */
   hasStopped = false;
   /** Registered in the all-way-stop queue. */
@@ -26,18 +28,25 @@ export class JunctionState {
   waitTime = 0;
   /** Last reason we were held (for debug HUD). */
   reason = "";
+  /** Seconds held inside the junction by stationary vehicles only (deadlock breaker). */
+  connWait = 0;
+  /** Deadlock broken in our favour: ignore stationary higher-id blockers until we leave. */
+  tieBreak = false;
   lastIndication: Indication | undefined = undefined;
 
   reset(laneId: number): void {
     this.laneId = laneId;
     this.yellow = undefined;
     this.redRun = false;
+    this.redDecided = false;
     this.hasStopped = false;
     this.queued = false;
     this.boxIgnore = false;
     this.waitTime = 0;
     this.reason = "";
     this.lastIndication = undefined;
+    this.connWait = 0;
+    this.tieBreak = false;
   }
 }
 
@@ -137,10 +146,11 @@ export function entryMode(ctx: SimContext, d: DriverView, c: Connector, distToLi
         if (d.emergency) return "stop_then_yield";
         if (d.js.yellow === "go" && distToLine < 3) return "go"; // committed at the change
         // Red-light running: rare, needs low lawfulness or rage; decided once.
-        if (!d.js.redRun && d.js.lastIndication === "red" && distToLine > 25 && Math.abs(v.speed) > 8) {
+        if (!d.js.redDecided && distToLine > 25 && Math.abs(v.speed) > 8) {
+          d.js.redDecided = true;
           const chance = (1 - d.p.lawfulness) * 0.08 + (d.raging ? 0.5 : 0) + (d.mood === "furious" ? 0.15 : 0);
           if (d.roll() < chance) d.js.redRun = true;
-        }
+        } else if (!d.js.redDecided && distToLine <= 25) d.js.redDecided = true;
         if (d.js.redRun) return "yield";
         const sig = ctx.signals[n.signalId];
         if (c.turn === "right" && sig.allowRightOnRed) return "stop_then_yield";
@@ -380,16 +390,22 @@ export function approachStopDistance(ctx: SimContext, d: DriverView, lane: Lane,
  * While on a connector: distance to stop before a conflict zone that is still
  * occupied (or contested by a priority movement for permissive lefts).
  */
-export function connectorStopDistance(ctx: SimContext, d: DriverView, c: Connector): number {
+export function connectorStopDistance(ctx: SimContext, d: DriverView, c: Connector, dt: number): number {
   const me = d.v;
   const front = me.s + me.halfLen;
   const sp = Math.max(0, me.speed);
   let stopAt = Infinity;
+  // Deadlock breaker: after waiting a while on stationary vehicles only, the
+  // lower id proceeds (the other keeps waiting for it to clear).
+  if (d.js.connWait > 4) d.js.tieBreak = true;
+  const breakTies = d.js.tieBreak;
+  let onlyStationary = true;
   for (const z of c.conflicts) {
     if (z.s0 < front - 0.5) continue; // already in or past the zone
     const distToZone = z.s0 - front - 0.5;
     const tArrive = distToZone / Math.max(sp, 2);
     const o = z.other;
+    const prio = hasPriority(ctx, o, c);
     let blocked = false;
     for (let i = 0; i < o.occCount && !blocked; i++) {
       const e = o.occ[i];
@@ -398,13 +414,17 @@ export function connectorStopDistance(ctx: SimContext, d: DriverView, c: Connect
       if (e.s - half > z.os1) continue;
       const inside = e.s + half > z.os0;
       if (!inside && e.v < 0.5 && me.id < e.occ.id) continue;
-      if (!inside && !hasPriority(ctx, o, c) && e.v < 3) continue;
+      if (!inside && !prio && e.v < 3) continue;
+      if (e.v < 0.5 && breakTies && me.id < e.occ.id) continue;
       const tClear = (z.os1 - (e.s - half)) / Math.max(e.v, 1.0);
       const tThem = inside ? 0 : Math.max(0, z.os0 - e.s - half) / Math.max(e.v, 0.5);
-      if (inside || (hasPriority(ctx, o, c) && tThem < tArrive + 2.0) || tClear > tArrive - 0.2) blocked = true;
+      if (inside || (prio && tThem < tArrive + 2.0) || tClear > tArrive - 0.2) {
+        blocked = true;
+        if (e.v >= 0.5) onlyStationary = false;
+      }
     }
     // Permissive lefts also wait for oncoming traffic still on its approach lane.
-    if (!blocked && c.turn === "left" && hasPriority(ctx, o, c)) {
+    if (!blocked && c.turn === "left" && prio) {
       const lane = o.from;
       const tMe = timeToCover(sp, distToZone + (z.s1 - z.s0) + me.length, 2.0, c.speedLimit);
       for (let i = 0; i < lane.occCount; i++) {
@@ -414,6 +434,7 @@ export function connectorStopDistance(ctx: SimContext, d: DriverView, c: Connect
         const t = (lane.length - e.s - e.occ.length / 2 + z.os0) / Math.max(e.v, 0.5);
         if (t < tMe + 1.0) {
           blocked = true;
+          onlyStationary = false;
           break;
         }
       }
@@ -423,6 +444,7 @@ export function connectorStopDistance(ctx: SimContext, d: DriverView, c: Connect
       break;
     }
   }
+  if (stopAt < Infinity && sp < 0.3 && onlyStationary) d.js.connWait += dt;
   return stopAt;
 }
 

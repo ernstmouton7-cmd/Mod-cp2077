@@ -586,10 +586,9 @@ export class World implements SimContext {
         pt.running = false;
         v.inputs.throttle = 0;
       }
-      let throttle = v.inputs.throttle;
-      if (dyn.tcsActive) throttle *= 0.4;
-      if (dyn.escActive) throttle *= 0.6;
-      const torque = pt.update(dt, dyn.drivenOmega(), throttle, dyn.u);
+      // Traction/stability control cut torque, not the pedal (keeps shift logic stable).
+      const cut = (dyn.tcsActive ? 0.4 : 1) * (dyn.escActive ? 0.6 : 1);
+      const torque = pt.update(dt, dyn.drivenOmega(), v.inputs.throttle, dyn.u, cut);
       const onRoad = isPlayer ? this.monitor.info.onRoad : true;
       dyn.surfaceGrip = grip * (onRoad ? 1 : 0.82);
       dyn.surfaceDrag = onRoad ? 0 : 1.5;

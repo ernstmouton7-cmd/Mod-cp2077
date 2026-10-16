@@ -386,7 +386,7 @@ export class AIDriver implements DriverView {
       this.stopDist = approachStopDistance(ctx, this, seg as Lane, this.next, dt);
       if (this.emergency && this.next.node.control === "signal" && seg.length - v.s < 120) ctx.signals[this.next.node.signalId].requestPreempt(this.next.approach);
     } else if (seg.kind === "connector") {
-      this.stopDist = connectorStopDistance(ctx, this, seg as Connector);
+      this.stopDist = connectorStopDistance(ctx, this, seg as Connector, dt);
     }
     // End of a lane with no exit at all: stop.
     if (seg.kind === "lane" && this.next === undefined) this.stopDist = Math.min(this.stopDist, seg.length - v.s - v.halfLen);

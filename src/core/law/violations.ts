@@ -59,6 +59,8 @@ export const VIOLATIONS: Record<ViolationKind, ViolationDef> = {
 
 export type Witness = "police" | "camera" | "none";
 
+const SPEED_TIERS: ViolationKind[] = ["speeding_minor", "speeding_major", "speeding_extreme"];
+
 export interface ViolationRecord {
   kind: ViolationKind;
   label: string;
@@ -92,6 +94,18 @@ export class DrivingRecord {
   }
 
   canCharge(kind: ViolationKind, now: number): boolean {
+    const tier = SPEED_TIERS.indexOf(kind);
+    if (tier >= 0) {
+      // Speeding tiers share one cooldown; a higher tier may upgrade after 8 s.
+      for (let i = 0; i < SPEED_TIERS.length; i++) {
+        const t = this.lastCharged.get(SPEED_TIERS[i]);
+        if (t === undefined) continue;
+        const age = now - t;
+        if (i >= tier && age < VIOLATIONS[kind].cooldown) return false;
+        if (i < tier && age < 8) return false;
+      }
+      return true;
+    }
     const last = this.lastCharged.get(kind);
     return last === undefined || now - last >= VIOLATIONS[kind].cooldown;
   }

@@ -5582,6 +5582,8 @@ function Powertrain.prototype.____constructor(self, spec)
     self.cranking = 0
     self.fuelUsed = 0
     self.limiter = 0
+    self.sinceShift = 10
+    self.lastShiftDir = 0
     self.maxGear = #spec.gears
     self.rpm = spec.idleRpm
     self.fuel = spec.fuelCapacity * 0.75
@@ -5607,6 +5609,8 @@ function Powertrain.prototype.shiftTo(self, g)
     if target == self.gear and self.shiftTimer <= 0 then
         return false
     end
+    self.lastShiftDir = target > self.gear and 1 or -1
+    self.sinceShift = 0
     self.pendingGear = target
     self.shiftTimer = self.spec.shiftTime
     return true
@@ -5654,8 +5658,12 @@ function Powertrain.prototype.torqueAt(self, rpm, throttle)
     local drag = self.spec.engineBrake * clamp((rpm - self.spec.idleRpm * 1.05) / (self.spec.redline - self.spec.idleRpm), 0, 1.2)
     return throttle * full * healthFactor - (1 - throttle) * drag
 end
-function Powertrain.prototype.update(self, dt, wheelOmega, throttle, speed)
+function Powertrain.prototype.update(self, dt, wheelOmega, throttle, speed, torqueScale)
+    if torqueScale == nil then
+        torqueScale = 1
+    end
     local spec = self.spec
+    self.sinceShift = self.sinceShift + dt
     if self.cranking > 0 then
         self.cranking = self.cranking - dt
         self.rpm = 280 + 60 * math.sin(self.cranking * 47)
@@ -5746,7 +5754,7 @@ function Powertrain.prototype.update(self, dt, wheelOmega, throttle, speed)
     local used = (powerKw * 0.33 + 0.8) * (dt / 3600)
     self.fuel = math.max(0, self.fuel - used)
     self.fuelUsed = self.fuelUsed + used
-    return tq * ratio * 0.9 * couple
+    return tq * ratio * 0.9 * couple * (tq > 0 and torqueScale or 1)
 end
 function Powertrain.prototype.autoShift(self, throttle, speed)
     if self.shiftTimer > 0 then
@@ -5760,12 +5768,17 @@ function Powertrain.prototype.autoShift(self, throttle, speed)
     local rpm = math.abs(speed) / spec.wheelRadius * ratio * RPM_PER_RADS
     local upAt = spec.idleRpm + (spec.redline - spec.idleRpm) * (0.35 + 0.6 * throttle)
     local downAt = spec.idleRpm * 1.25 + (spec.redline - spec.idleRpm) * 0.28 * throttle
+    local settled = self.sinceShift > 1.5 or self.lastShiftDir == 0
     if rpm > upAt and self.gear < self.maxGear then
-        self:shiftTo(self.gear + 1)
+        if settled or self.lastShiftDir > 0 then
+            self:shiftTo(self.gear + 1)
+        end
     elseif self.gear > 1 then
         local lowerRatio = self:ratio(self.gear - 1) * spec.finalDrive
         local rpmLower = math.abs(speed) / spec.wheelRadius * lowerRatio * RPM_PER_RADS
-        if rpm < downAt or throttle > 0.9 and rpmLower < spec.redline * 0.82 and rpm < spec.redline * 0.55 then
+        local lowerUpAt = spec.idleRpm + (spec.redline - spec.idleRpm) * (0.35 + 0.6 * throttle)
+        local kickdown = throttle > 0.9 and rpmLower < math.min(spec.redline * 0.8, lowerUpAt * 0.9) and rpm < spec.redline * 0.5
+        if rpm < downAt or kickdown and (settled or self.lastShiftDir < 0) then
             self:shiftTo(self.gear - 1)
         end
     end
@@ -7059,23 +7072,29 @@ function JunctionState.prototype.____constructor(self)
     self.laneId = -1
     self.yellow = nil
     self.redRun = false
+    self.redDecided = false
     self.hasStopped = false
     self.queued = false
     self.boxIgnore = false
     self.waitTime = 0
     self.reason = ""
+    self.connWait = 0
+    self.tieBreak = false
     self.lastIndication = nil
 end
 function JunctionState.prototype.reset(self, laneId)
     self.laneId = laneId
     self.yellow = nil
     self.redRun = false
+    self.redDecided = false
     self.hasStopped = false
     self.queued = false
     self.boxIgnore = false
     self.waitTime = 0
     self.reason = ""
     self.lastIndication = nil
+    self.connWait = 0
+    self.tieBreak = false
 end
 local MOVE_RANK = {straight = 3, right = 2, left = 1, uturn = 0}
 local function indRank(i)
@@ -7189,11 +7208,14 @@ function ____exports.entryMode(ctx, d, c, distToLine)
                     if d.js.yellow == "go" and distToLine < 3 then
                         return "go"
                     end
-                    if not d.js.redRun and d.js.lastIndication == "red" and distToLine > 25 and math.abs(v.speed) > 8 then
+                    if not d.js.redDecided and distToLine > 25 and math.abs(v.speed) > 8 then
+                        d.js.redDecided = true
                         local chance = (1 - d.p.lawfulness) * 0.08 + (d.raging and 0.5 or 0) + (d.mood == "furious" and 0.15 or 0)
                         if d:roll() < chance then
                             d.js.redRun = true
                         end
+                    elseif not d.js.redDecided and distToLine <= 25 then
+                        d.js.redDecided = true
                     end
                     if d.js.redRun then
                         return "yield"
@@ -7211,13 +7233,13 @@ function ____exports.entryMode(ctx, d, c, distToLine)
         until true
     end
     repeat
-        local ____switch28 = ap.sign
-        local ____cond28 = ____switch28 == "stop"
-        if ____cond28 then
+        local ____switch29 = ap.sign
+        local ____cond29 = ____switch29 == "stop"
+        if ____cond29 then
             return n.control == "allway_stop" and "allway" or "stop_then_yield"
         end
-        ____cond28 = ____cond28 or ____switch28 == "yield"
-        if ____cond28 then
+        ____cond29 = ____cond29 or ____switch29 == "yield"
+        if ____cond29 then
             return "yield"
         end
         do
@@ -7247,11 +7269,11 @@ local function committedBlock(ctx, c, me, sMe, speed, strict)
         local k = 0
         while k < #c.conflicts do
             do
-                local __continue33
+                local __continue34
                 repeat
                     local z = c.conflicts[k + 1]
                     if z.s1 < sMe - me.halfLen then
-                        __continue33 = true
+                        __continue34 = true
                         break
                     end
                     local o = z.other
@@ -7259,27 +7281,27 @@ local function committedBlock(ctx, c, me, sMe, speed, strict)
                         local i = 0
                         while i < o.occCount do
                             do
-                                local __continue35
+                                local __continue36
                                 repeat
                                     local e = o.occ[i + 1]
                                     local occ = e.occ
                                     if occ.id == me.id then
-                                        __continue35 = true
+                                        __continue36 = true
                                         break
                                     end
                                     local half = occ.length / 2
                                     if e.s - half > z.os1 then
-                                        __continue35 = true
+                                        __continue36 = true
                                         break
                                     end
                                     local inside = e.s + half > z.os0
                                     if not inside and e.v < 0.5 then
                                         if not ____exports.hasPriority(ctx, o, c) then
-                                            __continue35 = true
+                                            __continue36 = true
                                             break
                                         end
                                         if not strict or me.id < occ.id then
-                                            __continue35 = true
+                                            __continue36 = true
                                             break
                                         end
                                     end
@@ -7288,18 +7310,18 @@ local function committedBlock(ctx, c, me, sMe, speed, strict)
                                     if tClear > tEnter - 0.3 then
                                         return true
                                     end
-                                    __continue35 = true
+                                    __continue36 = true
                                 until true
-                                if not __continue35 then
+                                if not __continue36 then
                                     break
                                 end
                             end
                             i = i + 1
                         end
                     end
-                    __continue33 = true
+                    __continue34 = true
                 until true
-                if not __continue33 then
+                if not __continue34 then
                     break
                 end
             end
@@ -7318,12 +7340,12 @@ local function priorityBlock(ctx, d, c, distToLine, gapScale)
         local k = 0
         while k < #c.conflicts do
             do
-                local __continue43
+                local __continue44
                 repeat
                     local z = c.conflicts[k + 1]
                     local o = z.other
                     if not ____exports.hasPriority(ctx, o, c) then
-                        __continue43 = true
+                        __continue44 = true
                         break
                     end
                     local tMe = ____exports.timeToCover(me.speed, distToLine + z.s1 + me.length, a, vmax)
@@ -7332,29 +7354,29 @@ local function priorityBlock(ctx, d, c, distToLine, gapScale)
                         local i = 0
                         while i < o.occCount do
                             do
-                                local __continue45
+                                local __continue46
                                 repeat
                                     local e = o.occ[i + 1]
                                     if e.occ.id == me.id then
-                                        __continue45 = true
+                                        __continue46 = true
                                         break
                                     end
                                     if e.s - e.occ.length / 2 > z.os1 then
-                                        __continue45 = true
+                                        __continue46 = true
                                         break
                                     end
                                     local dist = z.os0 - e.s - e.occ.length / 2
                                     local t = dist <= 0 and 0 or dist / math.max(e.v, 0.5)
                                     if e.v < 0.5 and dist > 2 then
-                                        __continue45 = true
+                                        __continue46 = true
                                         break
                                     end
                                     if t < need then
                                         return true
                                     end
-                                    __continue45 = true
+                                    __continue46 = true
                                 until true
-                                if not __continue45 then
+                                if not __continue46 then
                                     break
                                 end
                             end
@@ -7366,20 +7388,20 @@ local function priorityBlock(ctx, d, c, distToLine, gapScale)
                         local i = 0
                         while i < lane.occCount do
                             do
-                                local __continue50
+                                local __continue51
                                 repeat
                                     local e = lane.occ[i + 1]
                                     local occ = e.occ
                                     if occ.id == me.id then
-                                        __continue50 = true
+                                        __continue51 = true
                                         break
                                     end
                                     if occ.intentConnector ~= o.id and occ.intentConnector ~= -1 then
-                                        __continue50 = true
+                                        __continue51 = true
                                         break
                                     end
                                     if e.v < 1 then
-                                        __continue50 = true
+                                        __continue51 = true
                                         break
                                     end
                                     local dist = lane.length - e.s - occ.length / 2 + z.os0
@@ -7387,18 +7409,18 @@ local function priorityBlock(ctx, d, c, distToLine, gapScale)
                                     if t < need then
                                         return true
                                     end
-                                    __continue50 = true
+                                    __continue51 = true
                                 until true
-                                if not __continue50 then
+                                if not __continue51 then
                                     break
                                 end
                             end
                             i = i + 1
                         end
                     end
-                    __continue43 = true
+                    __continue44 = true
                 until true
-                if not __continue43 then
+                if not __continue44 then
                     break
                 end
             end
@@ -7416,11 +7438,11 @@ local function boxBlocked(c, me)
         local i = 0
         while i < lane.occCount do
             do
-                local __continue56
+                local __continue57
                 repeat
                     local e = lane.occ[i + 1]
                     if e.occ.id == me.id then
-                        __continue56 = true
+                        __continue57 = true
                         break
                     end
                     local tail = e.s - e.occ.length / 2
@@ -7428,9 +7450,9 @@ local function boxBlocked(c, me)
                         minS = tail
                         minV = e.v
                     end
-                    __continue56 = true
+                    __continue57 = true
                 until true
-                if not __continue56 then
+                if not __continue57 then
                     break
                 end
             end
@@ -7489,28 +7511,28 @@ local function allWayTurn(ctx, d, c)
             local i = 0
             while i < lane.occCount do
                 do
-                    local __continue72
+                    local __continue73
                     repeat
                         local e = lane.occ[i + 1]
                         if e.occ.id == d.v.id then
-                            __continue72 = true
+                            __continue73 = true
                             break
                         end
                         local t = q.arrivals:get(e.occ.id)
                         if t == nil then
-                            __continue72 = true
+                            __continue73 = true
                             break
                         end
                         if e.occ.intentConnector ~= z.other.id and e.occ.intentConnector ~= -1 then
-                            __continue72 = true
+                            __continue73 = true
                             break
                         end
                         if t < mine - 0.05 or math.abs(t - mine) <= 0.05 and e.occ.id < d.v.id then
                             return false
                         end
-                        __continue72 = true
+                        __continue73 = true
                     until true
-                    if not __continue72 then
+                    if not __continue73 then
                         break
                     end
                 end
@@ -7614,88 +7636,102 @@ function ____exports.approachStopDistance(ctx, d, lane, c, dt)
 end
 --- While on a connector: distance to stop before a conflict zone that is still
 -- occupied (or contested by a priority movement for permissive lefts).
-function ____exports.connectorStopDistance(ctx, d, c)
+function ____exports.connectorStopDistance(ctx, d, c, dt)
     local me = d.v
     local front = me.s + me.halfLen
     local sp = math.max(0, me.speed)
     local stopAt = math.huge
+    if d.js.connWait > 4 then
+        d.js.tieBreak = true
+    end
+    local breakTies = d.js.tieBreak
+    local onlyStationary = true
     for ____, z in ipairs(c.conflicts) do
         do
-            local __continue97
+            local __continue99
             repeat
                 if z.s0 < front - 0.5 then
-                    __continue97 = true
+                    __continue99 = true
                     break
                 end
                 local distToZone = z.s0 - front - 0.5
                 local tArrive = distToZone / math.max(sp, 2)
                 local o = z.other
+                local prio = ____exports.hasPriority(ctx, o, c)
                 local blocked = false
                 do
                     local i = 0
                     while i < o.occCount and not blocked do
                         do
-                            local __continue99
+                            local __continue101
                             repeat
                                 local e = o.occ[i + 1]
                                 if e.occ.id == me.id then
-                                    __continue99 = true
+                                    __continue101 = true
                                     break
                                 end
                                 local half = e.occ.length / 2
                                 if e.s - half > z.os1 then
-                                    __continue99 = true
+                                    __continue101 = true
                                     break
                                 end
                                 local inside = e.s + half > z.os0
                                 if not inside and e.v < 0.5 and me.id < e.occ.id then
-                                    __continue99 = true
+                                    __continue101 = true
                                     break
                                 end
-                                if not inside and not ____exports.hasPriority(ctx, o, c) and e.v < 3 then
-                                    __continue99 = true
+                                if not inside and not prio and e.v < 3 then
+                                    __continue101 = true
+                                    break
+                                end
+                                if e.v < 0.5 and breakTies and me.id < e.occ.id then
+                                    __continue101 = true
                                     break
                                 end
                                 local tClear = (z.os1 - (e.s - half)) / math.max(e.v, 1)
                                 local tThem = inside and 0 or math.max(0, z.os0 - e.s - half) / math.max(e.v, 0.5)
-                                if inside or ____exports.hasPriority(ctx, o, c) and tThem < tArrive + 2 or tClear > tArrive - 0.2 then
+                                if inside or prio and tThem < tArrive + 2 or tClear > tArrive - 0.2 then
                                     blocked = true
+                                    if e.v >= 0.5 then
+                                        onlyStationary = false
+                                    end
                                 end
-                                __continue99 = true
+                                __continue101 = true
                             until true
-                            if not __continue99 then
+                            if not __continue101 then
                                 break
                             end
                         end
                         i = i + 1
                     end
                 end
-                if not blocked and c.turn == "left" and ____exports.hasPriority(ctx, o, c) then
+                if not blocked and c.turn == "left" and prio then
                     local lane = o.from
                     local tMe = ____exports.timeToCover(sp, distToZone + (z.s1 - z.s0) + me.length, 2, c.speedLimit)
                     do
                         local i = 0
                         while i < lane.occCount do
                             do
-                                local __continue106
+                                local __continue110
                                 repeat
                                     local e = lane.occ[i + 1]
                                     if e.occ.id == me.id or e.v < 1 then
-                                        __continue106 = true
+                                        __continue110 = true
                                         break
                                     end
                                     if e.occ.intentConnector ~= o.id and e.occ.intentConnector ~= -1 then
-                                        __continue106 = true
+                                        __continue110 = true
                                         break
                                     end
                                     local t = (lane.length - e.s - e.occ.length / 2 + z.os0) / math.max(e.v, 0.5)
                                     if t < tMe + 1 then
                                         blocked = true
+                                        onlyStationary = false
                                         break
                                     end
-                                    __continue106 = true
+                                    __continue110 = true
                                 until true
-                                if not __continue106 then
+                                if not __continue110 then
                                     break
                                 end
                             end
@@ -7707,12 +7743,16 @@ function ____exports.connectorStopDistance(ctx, d, c)
                     stopAt = math.min(stopAt, distToZone)
                     break
                 end
-                __continue97 = true
+                __continue99 = true
             until true
-            if not __continue97 then
+            if not __continue99 then
                 break
             end
         end
+    end
+    if stopAt < math.huge and sp < 0.3 and onlyStationary then
+        local ____d_js_6, ____connWait_7 = d.js, "connWait"
+        ____d_js_6[____connWait_7] = ____d_js_6[____connWait_7] + dt
     end
     return stopAt
 end
@@ -8313,7 +8353,7 @@ function AIDriver.prototype.laneUpdate(self, dt, ctx)
             ctx.signals[self.next.node.signalId + 1]:requestPreempt(self.next.approach)
         end
     elseif seg.kind == "connector" then
-        self.stopDist = connectorStopDistance(ctx, self, seg)
+        self.stopDist = connectorStopDistance(ctx, self, seg, dt)
     end
     if seg.kind == "lane" and self.next == nil then
         self.stopDist = math.min(self.stopDist, seg.length - v.s - v.halfLen)
@@ -9348,6 +9388,7 @@ local ____lualib = require("lualib_bundle")
 local __TS__Class = ____lualib.__TS__Class
 local Map = ____lualib.Map
 local __TS__New = ____lualib.__TS__New
+local __TS__ArrayIndexOf = ____lualib.__TS__ArrayIndexOf
 local __TS__ArraySplice = ____lualib.__TS__ArraySplice
 local __TS__ArrayReduce = ____lualib.__TS__ArrayReduce
 local ____exports = {}
@@ -9500,6 +9541,7 @@ ____exports.VIOLATIONS = {
         cooldown = 60
     }
 }
+local SPEED_TIERS = {"speeding_minor", "speeding_major", "speeding_extreme"}
 --- The player's driving record and wallet.
 ____exports.DrivingRecord = __TS__Class()
 local DrivingRecord = ____exports.DrivingRecord
@@ -9520,6 +9562,37 @@ function DrivingRecord.prototype.suspended(self)
     return self.points >= self.maxPoints
 end
 function DrivingRecord.prototype.canCharge(self, kind, now)
+    local tier = __TS__ArrayIndexOf(SPEED_TIERS, kind)
+    if tier >= 0 then
+        do
+            local i = 0
+            while i < #SPEED_TIERS do
+                do
+                    local __continue6
+                    repeat
+                        local t = self.lastCharged:get(SPEED_TIERS[i + 1])
+                        if t == nil then
+                            __continue6 = true
+                            break
+                        end
+                        local age = now - t
+                        if i >= tier and age < ____exports.VIOLATIONS[kind].cooldown then
+                            return false
+                        end
+                        if i < tier and age < 8 then
+                            return false
+                        end
+                        __continue6 = true
+                    until true
+                    if not __continue6 then
+                        break
+                    end
+                end
+                i = i + 1
+            end
+        end
+        return true
+    end
     local last = self.lastCharged:get(kind)
     return last == nil or now - last >= ____exports.VIOLATIONS[kind].cooldown
 end
@@ -9555,18 +9628,18 @@ function DrivingRecord.prototype.charge(self, recs)
     local total = 0
     for ____, r in ipairs(recs) do
         do
-            local __continue10
+            local __continue15
             repeat
                 if r.paid then
-                    __continue10 = true
+                    __continue15 = true
                     break
                 end
                 r.paid = true
                 total = total + r.fine
                 self.points = self.points + r.points
-                __continue10 = true
+                __continue15 = true
             until true
-            if not __continue10 then
+            if not __continue15 then
                 break
             end
         end
@@ -13264,18 +13337,13 @@ function World.prototype.physics(self, dt)
                         pt.running = false
                         v.inputs.throttle = 0
                     end
-                    local throttle = v.inputs.throttle
-                    if dyn.tcsActive then
-                        throttle = throttle * 0.4
-                    end
-                    if dyn.escActive then
-                        throttle = throttle * 0.6
-                    end
+                    local cut = (dyn.tcsActive and 0.4 or 1) * (dyn.escActive and 0.6 or 1)
                     local torque = pt:update(
                         dt,
                         dyn:drivenOmega(),
-                        throttle,
-                        dyn.u
+                        v.inputs.throttle,
+                        dyn.u,
+                        cut
                     )
                     local ____isPlayer_25
                     if isPlayer then
@@ -13315,11 +13383,11 @@ function World.prototype.physics(self, dt)
         local i = 0
         while i < #self.vehicles do
             do
-                local __continue159
+                local __continue157
                 repeat
                     local v = self.vehicles[i + 1]
                     if v.mode ~= "lane" then
-                        __continue159 = true
+                        __continue157 = true
                         break
                     end
                     local spec = v.spec
@@ -13332,9 +13400,9 @@ function World.prototype.physics(self, dt)
                     end
                     v.gearEstimate = g
                     v.rpmEstimate = math.max(spec.idleRpm, wheel * spec.gears[g]) + math.max(0, v.accel) * 300
-                    __continue159 = true
+                    __continue157 = true
                 until true
-                if not __continue159 then
+                if not __continue157 then
                     break
                 end
             end
@@ -13353,26 +13421,26 @@ function World.prototype.collisions(self)
         local i = 0
         while i < #self.vehicles do
             do
-                local __continue167
+                local __continue165
                 repeat
                     local a = self.vehicles[i + 1]
                     if not a.alive then
-                        __continue167 = true
+                        __continue165 = true
                         break
                     end
                     self.queryBuf = {}
                     self.vehicleHash:query(a.x, a.y, a.halfLen + 2, self.queryBuf)
                     for ____, b in ipairs(self.queryBuf) do
                         do
-                            local __continue169
+                            local __continue167
                             repeat
                                 if b.id <= a.id or not b.alive then
-                                    __continue169 = true
+                                    __continue167 = true
                                     break
                                 end
                                 if a.mode == "lane" and b.mode == "lane" then
                                     if not lanePairCanCollide(a, b) then
-                                        __continue169 = true
+                                        __continue167 = true
                                         break
                                     end
                                     local shrink = 0.85
@@ -13383,13 +13451,13 @@ function World.prototype.collisions(self)
                                     setBox(boxB, b, 1)
                                 end
                                 if not boxContact(boxA, boxB, contact) then
-                                    __continue169 = true
+                                    __continue167 = true
                                     break
                                 end
                                 self:resolveVehicles(a, b)
-                                __continue169 = true
+                                __continue167 = true
                             until true
-                            if not __continue169 then
+                            if not __continue167 then
                                 break
                             end
                         end
@@ -13397,9 +13465,9 @@ function World.prototype.collisions(self)
                     if a.mode == "physics" then
                         self:staticCollisions(a)
                     end
-                    __continue167 = true
+                    __continue165 = true
                 until true
-                if not __continue167 then
+                if not __continue165 then
                     break
                 end
             end
@@ -13525,11 +13593,11 @@ function World.prototype.staticCollisions(self, v)
     self.obstacleHash:query(v.x, v.y, v.halfLen + 1, self.obstacleBuf)
     for ____, o in ipairs(self.obstacleBuf) do
         do
-            local __continue193
+            local __continue191
             repeat
                 setBox(boxA, v, 1)
                 if not boxContact(boxA, o, contact) then
-                    __continue193 = true
+                    __continue191 = true
                     break
                 end
                 local j = resolveStatic(v.dyn, contact, 0.12, 0.5)
@@ -13551,9 +13619,9 @@ function World.prototype.staticCollisions(self, v)
                         d:onCrash(self, sev)
                     end
                 end
-                __continue193 = true
+                __continue191 = true
             until true
-            if not __continue193 then
+            if not __continue191 then
                 break
             end
         end
@@ -13702,16 +13770,16 @@ function World.prototype.playerSocial(self, dt, p)
             local i = 0
             while i < lane.occCount do
                 do
-                    local __continue226
+                    local __continue224
                     repeat
                         local e = lane.occ[i + 1]
                         if e.occ.id == p.id then
-                            __continue226 = true
+                            __continue224 = true
                             break
                         end
                         local v = self.byId:get(e.occ.id)
                         if v == nil then
-                            __continue226 = true
+                            __continue224 = true
                             break
                         end
                         local d = (v.x - p.x) * math.cos(p.heading) + (v.y - p.y) * math.sin(p.heading)
@@ -13719,9 +13787,9 @@ function World.prototype.playerSocial(self, dt, p)
                             best = d
                             leader = v
                         end
-                        __continue226 = true
+                        __continue224 = true
                     until true
-                    if not __continue226 then
+                    if not __continue224 then
                         break
                     end
                 end
@@ -13743,10 +13811,10 @@ function World.prototype.playerSocial(self, dt, p)
         self.vehicleHash:query(p.x, p.y, 6, self.queryBuf)
         for ____, v in ipairs(self.queryBuf) do
             do
-                local __continue234
+                local __continue232
                 repeat
                     if v == p then
-                        __continue234 = true
+                        __continue232 = true
                         break
                     end
                     local d = hypot(v.x - p.x, v.y - p.y) - (v.halfWid + p.halfWid)
@@ -13757,7 +13825,7 @@ function World.prototype.playerSocial(self, dt, p)
                     if d < 1.2 and rel > 7 then
                         local last = self.nearMissMemo:get(v.id) or -10
                         if self.time - last < 3 then
-                            __continue234 = true
+                            __continue232 = true
                             break
                         end
                         self.nearMissMemo:set(v.id, self.time)
@@ -13769,9 +13837,9 @@ function World.prototype.playerSocial(self, dt, p)
                             clamp(rel / 12, 0.5, 2)
                         )
                     end
-                    __continue234 = true
+                    __continue232 = true
                 until true
-                if not __continue234 then
+                if not __continue232 then
                     break
                 end
             end
@@ -13866,20 +13934,20 @@ function World.prototype.angryAtPlayer(self)
     end
     for ____, v in ipairs(self.vehicles) do
         do
-            local __continue258
+            local __continue256
             repeat
                 local d = self.drivers:get(v.id)
                 if d == nil then
-                    __continue258 = true
+                    __continue256 = true
                     break
                 end
                 local g = d.emo:grudgeAgainst(p.id)
                 if g > 10 and hypot(v.x - p.x, v.y - p.y) < 120 then
                     out[#out + 1] = {vehicle = v, anger = d.emo.anger, raging = d.rage ~= nil and d.rage.target == p.id}
                 end
-                __continue258 = true
+                __continue256 = true
             until true
-            if not __continue258 then
+            if not __continue256 then
                 break
             end
         end

@@ -39,6 +39,9 @@ export class Powertrain {
   fuelUsed = 0;
   /** Speed limiter target (m/s); 0 = off. */
   limiter = 0;
+  /** Seconds since the last gear change and its direction (+1 up, -1 down). */
+  private sinceShift = 10;
+  private lastShiftDir = 0;
 
   readonly maxGear: number;
 
@@ -63,6 +66,8 @@ export class Powertrain {
   shiftTo(g: Gear): boolean {
     const target = clamp(Math.floor(g), -1, this.maxGear);
     if (target === this.gear && this.shiftTimer <= 0) return false;
+    this.lastShiftDir = target > this.gear ? 1 : -1;
+    this.sinceShift = 0;
     this.pendingGear = target;
     this.shiftTimer = this.spec.shiftTime;
     return true;
@@ -114,9 +119,11 @@ export class Powertrain {
    * @param wheelOmega  angular speed of driven wheels (rad/s, signed)
    * @param throttle    0..1
    * @param speed       vehicle forward speed (m/s, signed)
+   * @param torqueScale traction/stability control torque cut (1 = none); does not affect shift logic
    */
-  update(dt: number, wheelOmega: number, throttle: number, speed: number): number {
+  update(dt: number, wheelOmega: number, throttle: number, speed: number, torqueScale = 1): number {
     const spec = this.spec;
+    this.sinceShift += dt;
     if (this.cranking > 0) {
       this.cranking -= dt;
       // Starter motor cranking speed with a little wobble.
@@ -206,7 +213,7 @@ export class Powertrain {
     this.fuel = Math.max(0, this.fuel - used);
     this.fuelUsed += used;
 
-    return tq * ratio * 0.9 * couple;
+    return tq * ratio * 0.9 * couple * (tq > 0 ? torqueScale : 1);
   }
 
   private autoShift(throttle: number, speed: number): void {
@@ -217,13 +224,17 @@ export class Powertrain {
     const rpm = (Math.abs(speed) / spec.wheelRadius) * ratio * RPM_PER_RADS;
     const upAt = spec.idleRpm + (spec.redline - spec.idleRpm) * (0.35 + 0.6 * throttle);
     const downAt = spec.idleRpm * 1.25 + (spec.redline - spec.idleRpm) * 0.28 * throttle;
+    // Hysteresis: no reversal of direction right after a shift.
+    const settled = this.sinceShift > 1.5 || this.lastShiftDir === 0;
     if (rpm > upAt && this.gear < this.maxGear) {
-      this.shiftTo(this.gear + 1);
+      if (settled || this.lastShiftDir > 0) this.shiftTo(this.gear + 1);
     } else if (this.gear > 1) {
       const lowerRatio = this.ratio(this.gear - 1) * spec.finalDrive;
       const rpmLower = (Math.abs(speed) / spec.wheelRadius) * lowerRatio * RPM_PER_RADS;
-      // Kickdown when the lower gear would still be below redline.
-      if (rpm < downAt || (throttle > 0.9 && rpmLower < spec.redline * 0.82 && rpm < spec.redline * 0.55)) this.shiftTo(this.gear - 1);
+      const lowerUpAt = spec.idleRpm + (spec.redline - spec.idleRpm) * (0.35 + 0.6 * throttle);
+      // Kickdown only if the lower gear has headroom before its own upshift point.
+      const kickdown = throttle > 0.9 && rpmLower < Math.min(spec.redline * 0.8, lowerUpAt * 0.9) && rpm < spec.redline * 0.5;
+      if (rpm < downAt || (kickdown && (settled || this.lastShiftDir < 0))) this.shiftTo(this.gear - 1);
     }
   }
 }
