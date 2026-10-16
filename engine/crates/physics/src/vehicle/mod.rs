@@ -164,6 +164,10 @@ pub struct WheelState {
     /// 0..1 damage: punctured tyre, bent suspension.
     pub damage: f32,
     pub detached: bool,
+    /// Standing water under the tyre (m), for spray and sounds.
+    pub water_depth: f32,
+    /// Grip multiplier from aquaplaning (1 = none).
+    pub aquaplane: f32,
 }
 
 /// Damage the dynamics care about (cosmetic deformation lives in `deform`).
@@ -780,6 +784,12 @@ fn substep(v: &mut Vehicle, ctx: &mut SubstepContext) {
         let surface_mu = surface_grip(w.surface)
             * (1.0 + (wet_factor(w.surface) - 1.0) * v.wetness.clamp(0.0, 1.0));
         let damage_mu = 1.0 - 0.5 * w.damage;
+        let depth = ctx
+            .puddles
+            .map_or(0.0, |p| p.depth_at(w.contact_point.x, w.contact_point.z));
+        w.water_depth = depth;
+        w.aquaplane = crate::water::aquaplane_grip(depth, vrel.length());
+        let damage_mu = damage_mu * w.aquaplane;
         let wheel_speed = w.omega * d.radius;
         let denom = v_long.abs().max(1.0);
         let kappa = (wheel_speed - v_long) / denom;

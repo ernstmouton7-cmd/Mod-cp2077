@@ -127,6 +127,9 @@ pub(crate) struct JointState {
     pub spring_soft: Softness,
     pub peak_lin: f32,
     pub peak_ang: f32,
+    /// Low-passed force/torque used for breaking (failure needs sustained load, not a spike).
+    pub stress_lin: f32,
+    pub stress_ang: f32,
 }
 
 impl Joint {
@@ -434,11 +437,19 @@ impl Joint {
     }
 
     /// Check break thresholds after a step (h = substep length).
-    pub(crate) fn finish(&mut self, h: f32) -> bool {
+    pub(crate) fn finish(&mut self, h: f32, dt: f32) -> bool {
         let f = self.state.peak_lin / h;
         let t = self.state.peak_ang / h;
         self.force = f;
         self.torque = t;
-        f > self.desc.break_force || t > self.desc.break_torque
+        // ~50 ms time constant.
+        let k = 1.0 - (-dt / 0.05).exp();
+        let s = &mut self.state;
+        s.stress_lin += (f - s.stress_lin) * k;
+        s.stress_ang += (t - s.stress_ang) * k;
+        s.stress_lin > self.desc.break_force
+            || s.stress_ang > self.desc.break_torque
+            || f > self.desc.break_force * 4.0
+            || t > self.desc.break_torque * 4.0
     }
 }

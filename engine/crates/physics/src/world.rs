@@ -113,6 +113,7 @@ pub struct SubstepContext<'a> {
     pub solver_of: &'a [u32],
     pub h: f32,
     pub gravity: Vec3,
+    pub puddles: Option<&'a crate::water::PuddleField>,
 }
 
 impl SubstepContext<'_> {
@@ -145,6 +146,8 @@ pub struct PhysicsWorld {
     events: Vec<PhysicsEvent>,
     moved: Vec<u32>,
     pub vehicles: Arena<crate::vehicle::Vehicle>,
+    /// Standing water on the roads (aquaplaning, tyre spray). Optional.
+    pub puddles: Option<crate::water::PuddleField>,
     pub stats: StepStats,
     pub time: f64,
     pub step_count: u64,
@@ -189,6 +192,7 @@ impl PhysicsWorld {
             events: Vec::new(),
             moved: Vec::new(),
             vehicles: Arena::new(),
+            puddles: None,
             stats: StepStats::default(),
             time: 0.0,
             step_count: 0,
@@ -1081,6 +1085,7 @@ impl PhysicsWorld {
                     solver_of: &self.solver_of,
                     h,
                     gravity: self.gravity,
+                    puddles: self.puddles.as_ref(),
                 };
                 crate::vehicle::substep_vehicles(&mut self.vehicles, &mut ctx);
             }
@@ -1149,7 +1154,7 @@ impl PhysicsWorld {
         // Joint breaking.
         for &jh in &active_joints {
             let j = &mut self.joints[jh];
-            if j.finish(h) {
+            if j.finish(h, dt) {
                 j.broken = true;
                 let (a, b) = (j.desc.body_a, j.desc.body_b);
                 self.events.push(PhysicsEvent::JointBroken {
