@@ -1,0 +1,223 @@
+//! Vehicle archetypes (numbers loosely based on real cars in each class).
+
+/// Vehicle class.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum VehicleClass {
+    Compact,
+    Sedan,
+    Sports,
+    Muscle,
+    Suv,
+    Van,
+    Truck,
+    Bus,
+    Taxi,
+    Police,
+    Ambulance,
+}
+
+/// Driven axles.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum DriveLayout {
+    Fwd,
+    Rwd,
+    Awd,
+}
+
+/// Physical and drivetrain parameters of a vehicle class.
+#[derive(Clone, Debug)]
+pub struct VehicleSpec {
+    pub id: VehicleClass,
+    pub name: &'static str,
+    pub length: f64,
+    pub width: f64,
+    pub height: f64,
+    pub wheelbase: f64,
+    /// Fraction of static weight on the front axle.
+    pub front_weight: f64,
+    pub cg_height: f64,
+    pub mass: f64,
+    pub wheel_radius: f64,
+    pub idle_rpm: f64,
+    pub redline: f64,
+    /// (rpm, torque N·m) at full throttle.
+    pub torque_curve: &'static [(f64, f64)],
+    /// Engine braking torque at redline with throttle closed (N·m).
+    pub engine_brake: f64,
+    pub gears: &'static [f64],
+    pub reverse_ratio: f64,
+    pub final_drive: f64,
+    pub shift_time: f64,
+    pub drive: DriveLayout,
+    /// Max total brake torque at the wheels (N·m), split by `brake_bias`.
+    pub brake_torque: f64,
+    pub brake_bias: f64,
+    /// Peak tyre friction coefficient on dry asphalt.
+    pub grip: f64,
+    /// Lateral tyre stiffness factor (B in the magic formula).
+    pub tire_b: f64,
+    pub tire_c: f64,
+    /// Drag area Cd·A (m²).
+    pub drag_area: f64,
+    pub roll_resist: f64,
+    pub max_steer: f64,
+    pub fuel_capacity: f64,
+    /// Rough peak power (kW) for AI acceleration limits.
+    pub power_kw: f64,
+    pub emergency: bool,
+    /// Audio hint: number of cylinders.
+    pub cylinders: u32,
+    /// Paint choices (RGB).
+    pub colors: &'static [u32],
+    /// Relative spawn frequency in civilian traffic.
+    pub spawn_weight: f64,
+}
+
+const CIV: [u32; 10] = [0xe8e8e8, 0x1a1a1a, 0x8a8f99, 0x3a4a6b, 0x7a1f1f, 0x2b5d3a, 0xc9b28a, 0x2a2a35, 0xd8d0c0, 0x4b2f5e];
+const COMPACT_COLORS: [u32; 12] = [0xe8e8e8, 0x1a1a1a, 0x8a8f99, 0x3a4a6b, 0x7a1f1f, 0x2b5d3a, 0xc9b28a, 0x2a2a35, 0xd8d0c0, 0x4b2f5e, 0xf2e14c, 0x6fb7d9];
+const BRIGHT: [u32; 8] = [0xff2a6d, 0x05d9e8, 0xf9c80e, 0xff6c11, 0x7b2ff7, 0x01ff89, 0xe0e0e0, 0x111111];
+const MUSCLE_COLORS: [u32; 18] = [
+    0xff2a6d, 0x05d9e8, 0xf9c80e, 0xff6c11, 0x7b2ff7, 0x01ff89, 0xe0e0e0, 0x111111, 0xe8e8e8, 0x1a1a1a, 0x8a8f99, 0x3a4a6b, 0x7a1f1f, 0x2b5d3a, 0xc9b28a, 0x2a2a35, 0xd8d0c0, 0x4b2f5e,
+];
+
+/// All vehicle specs, indexed by [`VehicleClass`] order.
+pub static SPECS: [VehicleSpec; 11] = [
+    VehicleSpec {
+        id: VehicleClass::Compact, name: "Makigai-style Compact", length: 3.9, width: 1.72, height: 1.45, wheelbase: 2.5, front_weight: 0.6, cg_height: 0.5,
+        mass: 1100.0, wheel_radius: 0.29, idle_rpm: 800.0, redline: 6500.0,
+        torque_curve: &[(800.0, 90.0), (2000.0, 125.0), (3500.0, 140.0), (5000.0, 132.0), (6500.0, 105.0)], engine_brake: 35.0,
+        gears: &[3.5, 2.0, 1.35, 1.0, 0.8], reverse_ratio: 3.3, final_drive: 4.1, shift_time: 0.35, drive: DriveLayout::Fwd,
+        brake_torque: 4200.0, brake_bias: 0.68, grip: 1.0, tire_b: 9.0, tire_c: 1.4, drag_area: 0.66, roll_resist: 0.013, max_steer: 0.62,
+        fuel_capacity: 40.0, power_kw: 75.0, emergency: false, cylinders: 4, colors: &COMPACT_COLORS, spawn_weight: 22.0,
+    },
+    VehicleSpec {
+        id: VehicleClass::Sedan, name: "Archer-style Sedan", length: 4.8, width: 1.85, height: 1.45, wheelbase: 2.85, front_weight: 0.57, cg_height: 0.52,
+        mass: 1550.0, wheel_radius: 0.32, idle_rpm: 750.0, redline: 6300.0,
+        torque_curve: &[(750.0, 160.0), (2000.0, 240.0), (4000.0, 260.0), (5500.0, 240.0), (6300.0, 200.0)], engine_brake: 45.0,
+        gears: &[3.6, 2.2, 1.5, 1.15, 0.92, 0.75], reverse_ratio: 3.4, final_drive: 3.7, shift_time: 0.3, drive: DriveLayout::Fwd,
+        brake_torque: 6200.0, brake_bias: 0.66, grip: 1.0, tire_b: 9.0, tire_c: 1.45, drag_area: 0.62, roll_resist: 0.012, max_steer: 0.6,
+        fuel_capacity: 60.0, power_kw: 140.0, emergency: false, cylinders: 4, colors: &CIV, spawn_weight: 30.0,
+    },
+    VehicleSpec {
+        id: VehicleClass::Sports, name: "Quadra-style Sports Coupe", length: 4.5, width: 1.95, height: 1.22, wheelbase: 2.65, front_weight: 0.48, cg_height: 0.42,
+        mass: 1380.0, wheel_radius: 0.34, idle_rpm: 900.0, redline: 8000.0,
+        torque_curve: &[(900.0, 250.0), (3000.0, 420.0), (5500.0, 470.0), (7000.0, 440.0), (8000.0, 380.0)], engine_brake: 60.0,
+        gears: &[3.1, 2.1, 1.6, 1.28, 1.05, 0.86], reverse_ratio: 3.0, final_drive: 3.6, shift_time: 0.12, drive: DriveLayout::Rwd,
+        brake_torque: 9000.0, brake_bias: 0.62, grip: 1.15, tire_b: 10.0, tire_c: 1.5, drag_area: 0.55, roll_resist: 0.011, max_steer: 0.56,
+        fuel_capacity: 65.0, power_kw: 360.0, emergency: false, cylinders: 8, colors: &BRIGHT, spawn_weight: 6.0,
+    },
+    VehicleSpec {
+        id: VehicleClass::Muscle, name: "Thorton-style Muscle Car", length: 4.9, width: 1.95, height: 1.35, wheelbase: 2.9, front_weight: 0.55, cg_height: 0.5,
+        mass: 1650.0, wheel_radius: 0.34, idle_rpm: 700.0, redline: 6200.0,
+        torque_curve: &[(700.0, 380.0), (2500.0, 560.0), (4000.0, 600.0), (5500.0, 540.0), (6200.0, 470.0)], engine_brake: 70.0,
+        gears: &[2.9, 1.9, 1.35, 1.0, 0.8], reverse_ratio: 2.9, final_drive: 3.3, shift_time: 0.25, drive: DriveLayout::Rwd,
+        brake_torque: 7600.0, brake_bias: 0.64, grip: 1.0, tire_b: 8.5, tire_c: 1.45, drag_area: 0.72, roll_resist: 0.013, max_steer: 0.58,
+        fuel_capacity: 70.0, power_kw: 320.0, emergency: false, cylinders: 8, colors: &MUSCLE_COLORS, spawn_weight: 8.0,
+    },
+    VehicleSpec {
+        id: VehicleClass::Suv, name: "Chevillon-style SUV", length: 4.95, width: 1.98, height: 1.8, wheelbase: 2.95, front_weight: 0.55, cg_height: 0.72,
+        mass: 2150.0, wheel_radius: 0.37, idle_rpm: 700.0, redline: 6000.0,
+        torque_curve: &[(700.0, 260.0), (2000.0, 380.0), (3500.0, 420.0), (5000.0, 380.0), (6000.0, 320.0)], engine_brake: 60.0,
+        gears: &[4.0, 2.4, 1.6, 1.2, 1.0, 0.8], reverse_ratio: 3.6, final_drive: 3.5, shift_time: 0.3, drive: DriveLayout::Awd,
+        brake_torque: 9500.0, brake_bias: 0.65, grip: 0.95, tire_b: 8.0, tire_c: 1.4, drag_area: 1.0, roll_resist: 0.015, max_steer: 0.6,
+        fuel_capacity: 80.0, power_kw: 210.0, emergency: false, cylinders: 6, colors: &CIV, spawn_weight: 16.0,
+    },
+    VehicleSpec {
+        id: VehicleClass::Van, name: "Mahir-style Van", length: 5.3, width: 2.0, height: 2.2, wheelbase: 3.3, front_weight: 0.55, cg_height: 0.85,
+        mass: 2400.0, wheel_radius: 0.36, idle_rpm: 750.0, redline: 5000.0,
+        torque_curve: &[(750.0, 260.0), (1800.0, 380.0), (3000.0, 390.0), (4200.0, 340.0), (5000.0, 280.0)], engine_brake: 60.0,
+        gears: &[4.2, 2.5, 1.6, 1.2, 1.0, 0.82], reverse_ratio: 3.8, final_drive: 3.9, shift_time: 0.35, drive: DriveLayout::Rwd,
+        brake_torque: 9500.0, brake_bias: 0.65, grip: 0.9, tire_b: 7.5, tire_c: 1.4, drag_area: 1.4, roll_resist: 0.016, max_steer: 0.62,
+        fuel_capacity: 80.0, power_kw: 130.0, emergency: false, cylinders: 4, colors: &[0xffffff, 0xd0d0d0, 0x28324a, 0x8a1c1c, 0xe0a030], spawn_weight: 7.0,
+    },
+    VehicleSpec {
+        id: VehicleClass::Truck, name: "Kaukaz-style Box Truck", length: 7.8, width: 2.45, height: 3.4, wheelbase: 4.8, front_weight: 0.5, cg_height: 1.2,
+        mass: 7500.0, wheel_radius: 0.5, idle_rpm: 600.0, redline: 2600.0,
+        torque_curve: &[(600.0, 900.0), (1200.0, 1400.0), (1800.0, 1450.0), (2300.0, 1200.0), (2600.0, 1000.0)], engine_brake: 400.0,
+        gears: &[6.5, 4.0, 2.6, 1.8, 1.3, 1.0], reverse_ratio: 6.0, final_drive: 4.1, shift_time: 0.6, drive: DriveLayout::Rwd,
+        brake_torque: 38000.0, brake_bias: 0.55, grip: 0.85, tire_b: 7.0, tire_c: 1.35, drag_area: 5.5, roll_resist: 0.008, max_steer: 0.6,
+        fuel_capacity: 300.0, power_kw: 220.0, emergency: false, cylinders: 6, colors: &[0xf0f0f0, 0xd04020, 0x204070, 0x2f2f2f], spawn_weight: 4.0,
+    },
+    VehicleSpec {
+        id: VehicleClass::Bus, name: "City Bus", length: 12.0, width: 2.55, height: 3.2, wheelbase: 6.2, front_weight: 0.38, cg_height: 1.1,
+        mass: 12000.0, wheel_radius: 0.5, idle_rpm: 600.0, redline: 2400.0,
+        torque_curve: &[(600.0, 1200.0), (1100.0, 1700.0), (1600.0, 1750.0), (2100.0, 1500.0), (2400.0, 1250.0)], engine_brake: 500.0,
+        gears: &[4.7, 2.6, 1.6, 1.15, 1.0, 0.8], reverse_ratio: 4.5, final_drive: 5.2, shift_time: 0.5, drive: DriveLayout::Rwd,
+        brake_torque: 60000.0, brake_bias: 0.5, grip: 0.85, tire_b: 7.0, tire_c: 1.35, drag_area: 7.0, roll_resist: 0.008, max_steer: 0.62,
+        fuel_capacity: 350.0, power_kw: 230.0, emergency: false, cylinders: 6, colors: &[0xf2c94c, 0x2d9cdb, 0xe0e0e0], spawn_weight: 2.0,
+    },
+    VehicleSpec {
+        id: VehicleClass::Taxi, name: "Delamain-style Cab", length: 4.85, width: 1.9, height: 1.5, wheelbase: 2.85, front_weight: 0.56, cg_height: 0.52,
+        mass: 1600.0, wheel_radius: 0.32, idle_rpm: 750.0, redline: 6300.0,
+        torque_curve: &[(750.0, 200.0), (2000.0, 300.0), (4000.0, 320.0), (5500.0, 290.0), (6300.0, 250.0)], engine_brake: 45.0,
+        gears: &[3.6, 2.2, 1.5, 1.15, 0.92, 0.75], reverse_ratio: 3.4, final_drive: 3.7, shift_time: 0.25, drive: DriveLayout::Awd,
+        brake_torque: 6600.0, brake_bias: 0.66, grip: 1.02, tire_b: 9.0, tire_c: 1.45, drag_area: 0.6, roll_resist: 0.012, max_steer: 0.6,
+        fuel_capacity: 60.0, power_kw: 180.0, emergency: false, cylinders: 6, colors: &[0xf2b705, 0x111111], spawn_weight: 7.0,
+    },
+    VehicleSpec {
+        id: VehicleClass::Police, name: "Patrol Interceptor", length: 5.0, width: 1.95, height: 1.5, wheelbase: 2.95, front_weight: 0.54, cg_height: 0.5,
+        mass: 1800.0, wheel_radius: 0.34, idle_rpm: 750.0, redline: 6800.0,
+        torque_curve: &[(750.0, 300.0), (2500.0, 470.0), (4500.0, 500.0), (6000.0, 460.0), (6800.0, 400.0)], engine_brake: 55.0,
+        gears: &[3.2, 2.1, 1.5, 1.15, 0.92, 0.75], reverse_ratio: 3.2, final_drive: 3.5, shift_time: 0.18, drive: DriveLayout::Awd,
+        brake_torque: 9800.0, brake_bias: 0.63, grip: 1.1, tire_b: 9.5, tire_c: 1.5, drag_area: 0.66, roll_resist: 0.012, max_steer: 0.6,
+        fuel_capacity: 75.0, power_kw: 300.0, emergency: true, cylinders: 8, colors: &[0x101820], spawn_weight: 0.0,
+    },
+    VehicleSpec {
+        id: VehicleClass::Ambulance, name: "Trauma Response Unit", length: 6.4, width: 2.2, height: 2.7, wheelbase: 3.9, front_weight: 0.5, cg_height: 1.0,
+        mass: 4200.0, wheel_radius: 0.4, idle_rpm: 700.0, redline: 5000.0,
+        torque_curve: &[(700.0, 450.0), (1800.0, 640.0), (3000.0, 660.0), (4200.0, 580.0), (5000.0, 500.0)], engine_brake: 120.0,
+        gears: &[4.0, 2.4, 1.6, 1.2, 1.0, 0.8], reverse_ratio: 3.8, final_drive: 4.1, shift_time: 0.35, drive: DriveLayout::Rwd,
+        brake_torque: 20000.0, brake_bias: 0.6, grip: 0.9, tire_b: 7.5, tire_c: 1.4, drag_area: 2.6, roll_resist: 0.014, max_steer: 0.62,
+        fuel_capacity: 120.0, power_kw: 240.0, emergency: true, cylinders: 8, colors: &[0xf4f4f4], spawn_weight: 0.0,
+    },
+];
+
+/// Classes that appear in civilian traffic (spawn order for weighted picks).
+pub const CIVILIAN_CLASSES: [VehicleClass; 9] = [
+    VehicleClass::Compact,
+    VehicleClass::Sedan,
+    VehicleClass::Sports,
+    VehicleClass::Muscle,
+    VehicleClass::Suv,
+    VehicleClass::Van,
+    VehicleClass::Truck,
+    VehicleClass::Bus,
+    VehicleClass::Taxi,
+];
+
+/// The spec of a class.
+#[inline]
+pub fn spec(cls: VehicleClass) -> &'static VehicleSpec {
+    &SPECS[cls as usize]
+}
+
+/// Approximate max acceleration (m/s²) at speed `v`, used by lane-mode AI.
+pub fn max_accel_at(spec: &VehicleSpec, v: f64) -> f64 {
+    let traction = spec.grip
+        * 9.81
+        * match spec.drive {
+            DriveLayout::Awd => 0.95,
+            DriveLayout::Rwd => 1.0 - spec.front_weight + 0.08,
+            DriveLayout::Fwd => spec.front_weight - 0.06,
+        };
+    let power = (spec.power_kw * 1000.0 * 0.85) / (spec.mass * v.max(3.0));
+    let drag = (0.5 * 1.2 * spec.drag_area * v * v) / spec.mass + spec.roll_resist * 9.81;
+    (traction.min(power) - drag).max(0.3)
+}
+
+/// Approximate top speed (m/s) from power and drag.
+pub fn top_speed(spec: &VehicleSpec) -> f64 {
+    let mut lo = 1.0;
+    let mut hi = 120.0;
+    let p = spec.power_kw * 1000.0 * 0.85;
+    for _ in 0..40 {
+        let v = (lo + hi) / 2.0;
+        let need = (0.5 * 1.2 * spec.drag_area * v * v + spec.roll_resist * spec.mass * 9.81) * v;
+        if need > p {
+            hi = v;
+        } else {
+            lo = v;
+        }
+    }
+    lo
+}

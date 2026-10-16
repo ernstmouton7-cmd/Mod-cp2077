@@ -1,0 +1,19 @@
+[package]
+name = "gridlock-traffic"
+description = "Gridlock city traffic simulation: road network, signals, vehicle dynamics, AI drivers with emotions and road rage, law and police."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "gridlock_traffic"
+path = "src/lib.rs"
+
+[dependencies]
+
+[dev-dependencies]
+
+[[example]]
+name = "bench"
+path = "examples/bench.rs"
