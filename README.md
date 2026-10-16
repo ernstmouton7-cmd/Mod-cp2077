@@ -85,6 +85,14 @@ hit-and-run. Cameras fine you by mail. An officer who sees it pulls you over:
 stop at the curb and wait for the ticket, or flee and start a pursuit with
 rising heat, extra units and an arrest if you stop next to a squad car.
 
+**Pedestrians.** People cross at marked crosswalks with the walk signal (or
+a gap at stop signs), look before stepping off, pause for cars and shout at
+close passes. Turning traffic yields to them, and so must you.
+
+**Incidents.** Cars break down and pull over with hazards (others change lanes
+or overtake through the oncoming lane on narrow streets), buses stop at the
+curb, and power cuts turn junctions dark so everyone treats them as an all-way stop.
+
 **World.** A day/night clock, weather (rain, storm, fog) that changes grip,
 visibility and driver caution, rush-hour traffic density, and an ambulance
 dispatched to serious crashes.
@@ -110,7 +118,7 @@ src/core/        engine-agnostic simulation (TypeScript, Lua-portable)
   signals/       signal controller
   vehicle/       specs, powertrain, dynamics, lights and equipment, damage
   physics/       box collisions and impulse response
-  ai/            driver brain, IDM, junction logic, personalities, emotions, speech
+  ai/            driver brain, IDM, junction logic, personalities, emotions, speech, pedestrians
   law/           violations, driving record, player monitor, police
   player/        actions and bindings, player driver
   world/         world loop, environment, spawner, events

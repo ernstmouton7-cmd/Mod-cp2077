@@ -132,6 +132,40 @@ Personalities (*generated*, averages of the sampled templates):
 | Zen master | 0.03 | 0.97 | 0.90 | 0.97× | 1.80 | 98% |
 <!-- /gen -->
 
+## Pedestrians (`ai/pedestrians.ts`, `road/crosswalks.ts`)
+
+Every controlled junction has a marked crosswalk across each road, 2.6 m inside
+the junction box. Each connector records where its path crosses a crosswalk.
+Pedestrians spawn at crosswalk ends (fewer at night and in the rain). They wait
+a step back from the curb for the walk signal of the parallel traffic, or, at
+stop-sign junctions, for a 3.5 s gap. They look before stepping off, pause for
+a car body in their path, shout at close passes, and walk away along the
+sidewalk once across. About 8% are reckless: they start on the flashing hand
+and accept shorter gaps.
+
+Drivers stop 1.6 m before a crosswalk on their movement while someone is on it
+or about to walk into their path. This matters most for turning traffic, which
+yields to people crossing with the green. A car whose front is already past its
+stop point keeps clearing the crosswalk unless a person is right in front of
+its bumper, which prevents car and pedestrian waiting for each other. The player
+is charged for failing to yield (passing close to someone crossing) or hitting
+a pedestrian, which also dispatches an ambulance.
+
+## Incidents (`world/world.ts`, `ai/driver.ts`)
+
+- **Breakdowns** (about every 80 s, near the player): a car pulls toward the
+  curb with its hazards on and stays for 40–90 s. Drivers behind change lanes.
+  On single-lane two-way streets they **overtake through the oncoming lane**
+  when it's clear for 90 m, and abort if it stops being clear before they are
+  committed. While overtaking, the car is registered in the oncoming lane, so
+  oncoming drivers see it and brake.
+- **Buses** stop mid-block on curb lanes for 7–14 s with the right indicator,
+  then signal left to pull out.
+- **Power cuts** (about every 5 min) turn a junction's signals dark for 80–140 s.
+  Drivers treat it as an all-way stop.
+
+Both can be turned off (`world.breakdownInterval = 0`, `world.outageInterval = 0`, or in the sandbox settings).
+
 ## Law and police (`law/`)
 
 Violations (*generated*):
