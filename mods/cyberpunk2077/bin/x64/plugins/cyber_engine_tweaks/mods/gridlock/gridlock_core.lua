@@ -13901,6 +13901,20 @@ local __TS__New = ____lualib.__TS__New
 local ____exports = {}
 local ____world = require("src.core.world.world")
 local WorldClass = ____world.World
+local ____lights = require("src.core.vehicle.lights")
+local LightsClass = ____lights.VehicleLights
+local ____emotion = require("src.core.ai.emotion")
+local EmotionClass = ____emotion.Emotion
+local ____personality = require("src.core.ai.personality")
+local sample = ____personality.samplePersonality
+local ____violations = require("src.core.law.violations")
+local RecordClass = ____violations.DrivingRecord
+local ____rng = require("src.core.math.rng")
+local RngClass = ____rng.Rng
+local ____signalController = require("src.core.signals.signalController")
+local SignalClass = ____signalController.SignalController
+local ____network = require("src.core.road.network")
+local NetworkClass = ____network.Network
 do
     local ____world = require("src.core.world.world")
     local World = ____world.World
@@ -14043,6 +14057,38 @@ ____exports.VERSION = "0.1.0"
 --- Factory for hosts that cannot use `new` (plain Lua: core.createWorld({ seed = 1 })).
 function ____exports.createWorld(opts)
     return __TS__New(WorldClass, opts or ({}))
+end
+function ____exports.createLights(seed)
+    return __TS__New(LightsClass, seed)
+end
+function ____exports.createEmotion(p)
+    return __TS__New(EmotionClass, p)
+end
+function ____exports.createRecord()
+    return __TS__New(RecordClass)
+end
+function ____exports.createRng(seed)
+    return __TS__New(RngClass, seed)
+end
+--- Sample a personality (optionally of a given archetype).
+function ____exports.randomPersonality(rng, archetype)
+    return sample(rng, archetype)
+end
+function ____exports.createNetwork()
+    return __TS__New(NetworkClass)
+end
+--- Build a signal controller for a finalized network node (custom maps).
+function ____exports.createSignal(id, net, nodeId, mode)
+    return __TS__New(SignalClass, id, net.nodes[nodeId + 1], {mode = mode or "actuated"})
+end
+do
+    local ____speech = require("src.core.ai.speech")
+    local lineFor = ____speech.lineFor
+    local APOLOGY_ACCEPTED = ____speech.APOLOGY_ACCEPTED
+    local APOLOGY_REJECTED = ____speech.APOLOGY_REJECTED
+    ____exports.lineFor = lineFor
+    ____exports.APOLOGY_ACCEPTED = APOLOGY_ACCEPTED
+    ____exports.APOLOGY_REJECTED = APOLOGY_REJECTED
 end
 return ____exports
  end,

@@ -44,3 +44,47 @@ import { World as WorldClass, WorldOptions as Opts } from "./world/world";
 export function createWorld(opts?: Opts): WorldClass {
   return new WorldClass(opts ?? {});
 }
+
+// ---------------------------------------------------------------------------
+// Factories for plain-Lua hosts (CET and other engines). TypeScriptToLua
+// classes need `new`, which Lua callers cannot write directly.
+// ---------------------------------------------------------------------------
+import { VehicleLights as LightsClass } from "./vehicle/lights";
+import { Emotion as EmotionClass } from "./ai/emotion";
+import { Personality as PersonalityT, samplePersonality as sample, Archetype as ArchetypeT } from "./ai/personality";
+import { DrivingRecord as RecordClass } from "./law/violations";
+import { Rng as RngClass } from "./math/rng";
+import { SignalController as SignalClass } from "./signals/signalController";
+import { Network as NetworkClass } from "./road/network";
+
+export function createLights(seed: number): LightsClass {
+  return new LightsClass(seed);
+}
+
+export function createEmotion(p: PersonalityT): EmotionClass {
+  return new EmotionClass(p);
+}
+
+export function createRecord(): RecordClass {
+  return new RecordClass();
+}
+
+export function createRng(seed: number): RngClass {
+  return new RngClass(seed);
+}
+
+/** Sample a personality (optionally of a given archetype). */
+export function randomPersonality(rng: RngClass, archetype?: ArchetypeT): PersonalityT {
+  return sample(rng, archetype);
+}
+
+export function createNetwork(): NetworkClass {
+  return new NetworkClass();
+}
+
+/** Build a signal controller for a finalized network node (custom maps). */
+export function createSignal(id: number, net: NetworkClass, nodeId: number, mode?: "fixed" | "actuated" | "flashing" | "off"): SignalClass {
+  return new SignalClass(id, net.nodes[nodeId], { mode: mode ?? "actuated" });
+}
+
+export { lineFor, APOLOGY_ACCEPTED, APOLOGY_REJECTED } from "./ai/speech";
