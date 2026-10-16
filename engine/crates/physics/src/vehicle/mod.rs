@@ -824,6 +824,9 @@ fn substep(v: &mut Vehicle, ctx: &mut SubstepContext) {
         };
         // Longitudinal: impulse that would exactly remove the slip velocity this substep.
         let slip_vel = wheel_speed - v_long;
+        if k_long + k_wheel <= 1e-12 || k_lat <= 1e-12 {
+            continue;
+        }
         let j_stop_x = slip_vel / (k_long + k_wheel);
         let jx = clamp_toward(tf.fx * h, j_stop_x);
         let j_stop_y = -v_lat / k_lat;

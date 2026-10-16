@@ -521,6 +521,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gridlock-game"
+version = "0.2.0"
+dependencies = [
+ "glam",
+ "gridlock-input",
+ "gridlock-physics",
+ "gridlock-traffic",
+]
+
+[[package]]
 name = "gridlock-input"
 version = "0.2.0"
 dependencies = [
@@ -545,6 +555,7 @@ dependencies = [
  "anyhow",
  "bytemuck",
  "glam",
+ "gridlock-assets",
  "half",
  "image",
  "log",

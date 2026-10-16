@@ -1,0 +1,12 @@
+[package]
+name = "gridlock-game"
+description = "Gridlock game layer: traffic simulation + physics + damage + input, producing renderer-agnostic scene frames"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+glam.workspace = true
+gridlock-physics = { path = "../physics" }
+gridlock-traffic = { path = "../traffic" }
+gridlock-input = { path = "../input", default-features = false }
