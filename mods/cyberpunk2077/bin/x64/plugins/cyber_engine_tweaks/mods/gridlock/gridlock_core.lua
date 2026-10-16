@@ -8256,28 +8256,28 @@ function ____exports.hornVictims(ctx, honker, long)
     local hs = math.sin(honker.heading)
     for ____, o in ipairs(ctx.vehicles) do
         do
-            local __continue294
+            local __continue331
             repeat
                 if o == honker or not o.alive then
-                    __continue294 = true
+                    __continue331 = true
                     break
                 end
                 local dx = o.x - honker.x
                 local dy = o.y - honker.y
                 local fwd = dx * hc + dy * hs
                 if fwd < 0 or fwd > 30 then
-                    __continue294 = true
+                    __continue331 = true
                     break
                 end
                 local side = math.abs(-dx * hs + dy * hc)
                 if side > 4 + fwd * 0.2 then
-                    __continue294 = true
+                    __continue331 = true
                     break
                 end
                 ctx:offend(honker, o, long and "long_honk" or "honked_at", 1)
-                __continue294 = true
+                __continue331 = true
             until true
-            if not __continue294 then
+            if not __continue331 then
                 break
             end
         end
@@ -8350,6 +8350,13 @@ function AIDriver.prototype.____constructor(self, v, p, seed)
     self.followTarget = -1
     self.followGap = 10
     self.headFor = nil
+    self.holdTime = 0
+    self.holdKind = nil
+    self.busStopLane = -1
+    self.departSignal = 0
+    self.passing = nil
+    self.passObstacle = -1
+    self.passWait = 0
     self.mood = "calm"
     self.raging = false
     self.signalDecided = -1
@@ -8366,9 +8373,20 @@ end
 function AIDriver.prototype.roll(self)
     return self.rng:next()
 end
+function AIDriver.prototype.hold(self, kind, seconds)
+    self.holdKind = kind
+    self.holdTime = seconds
+    self.lcIntent = nil
+end
 function AIDriver.prototype.status(self)
     if self.state ~= "drive" then
         return self.state
+    end
+    if self.holdTime > 0 then
+        return self.holdKind == "bus" and "bus stop" or "broken down"
+    end
+    if self.passing ~= nil then
+        return "overtaking"
     end
     if self.rage ~= nil then
         return "RAGE:" .. self.rage.behavior
@@ -8396,11 +8414,11 @@ function AIDriver.prototype.newDestination(self, ctx, lane)
         local attempt = 0
         while attempt < 6 do
             do
-                local __continue14
+                local __continue17
                 repeat
                     local goal = net.lanes[math.floor(self.rng:next() * #net.lanes) + 1]
                     if goal.road == lane.road then
-                        __continue14 = true
+                        __continue17 = true
                         break
                     end
                     local r = ctx.router:route(lane, goal.road, goal.forward)
@@ -8410,9 +8428,9 @@ function AIDriver.prototype.newDestination(self, ctx, lane)
                         self.next = self:connectorFrom(lane)
                         return
                     end
-                    __continue14 = true
+                    __continue17 = true
                 until true
-                if not __continue14 then
+                if not __continue17 then
                     break
                 end
             end
@@ -8504,19 +8522,19 @@ function AIDriver.prototype.scanLeader(self, ctx)
             local i = 0
             while i < seg.occCount do
                 do
-                    local __continue39
+                    local __continue42
                     repeat
                         local e = seg.occ[i + 1]
                         if e.occ.id == v.id then
-                            __continue39 = true
+                            __continue42 = true
                             break
                         end
                         if depth == 0 and e.s <= v.s + 0.05 then
-                            __continue39 = true
+                            __continue42 = true
                             break
                         end
                         if depth == 0 and math.abs(e.lat - v.lat) > (e.occ.width + v.width) / 2 + 0.25 then
-                            __continue39 = true
+                            __continue42 = true
                             break
                         end
                         local d = base + e.s - (e.occ.length + v.length) / 2
@@ -8528,9 +8546,9 @@ function AIDriver.prototype.scanLeader(self, ctx)
                             L.seg = seg
                             L.s = e.s
                         end
-                        __continue39 = true
+                        __continue42 = true
                     until true
-                    if not __continue39 then
+                    if not __continue42 then
                         break
                     end
                 end
@@ -8549,15 +8567,15 @@ function AIDriver.prototype.scanLeader(self, ctx)
                         local i = 0
                         while i < o.occCount do
                             do
-                                local __continue46
+                                local __continue49
                                 repeat
                                     local e = o.occ[i + 1]
                                     if e.occ.id == v.id or e.s - e.occ.length / 2 > diverge then
-                                        __continue46 = true
+                                        __continue49 = true
                                         break
                                     end
                                     if depth == 0 and e.s <= v.s then
-                                        __continue46 = true
+                                        __continue49 = true
                                         break
                                     end
                                     local d = base + e.s - (e.occ.length + v.length) / 2
@@ -8569,9 +8587,9 @@ function AIDriver.prototype.scanLeader(self, ctx)
                                         L.seg = o
                                         L.s = e.s
                                     end
-                                    __continue46 = true
+                                    __continue49 = true
                                 until true
-                                if not __continue46 then
+                                if not __continue49 then
                                     break
                                 end
                             end
@@ -8589,11 +8607,11 @@ function AIDriver.prototype.scanLeader(self, ctx)
                 local i = 0
                 while i < sh.occCount do
                     do
-                        local __continue51
+                        local __continue54
                         repeat
                             local e = sh.occ[i + 1]
                             if e.occ.id == v.id or e.s <= sMe then
-                                __continue51 = true
+                                __continue54 = true
                                 break
                             end
                             local d = e.s - sMe - (e.occ.length + v.length) / 2
@@ -8605,9 +8623,9 @@ function AIDriver.prototype.scanLeader(self, ctx)
                                 L.seg = sh
                                 L.s = e.s
                             end
-                            __continue51 = true
+                            __continue54 = true
                         until true
-                        if not __continue51 then
+                        if not __continue54 then
                             break
                         end
                     end
@@ -8806,7 +8824,59 @@ function AIDriver.prototype.laneUpdate(self, dt, ctx)
             idmAccel(v.speed, self.stopDist, v.speed, stopParams)
         )
     end
-    if self.yieldEmergency > 0 then
+    if v.spec.id == "bus" and seg.kind == "lane" and self.holdTime <= 0 then
+        local lane = seg
+        if lane.right == nil and lane.length > 60 and self.busStopLane ~= lane.id and v.s > lane.length * 0.45 and v.s < lane.length * 0.6 then
+            self.busStopLane = lane.id
+            if self.rng:chance(0.7) then
+                self:hold(
+                    "bus",
+                    self.rng:range(7, 14)
+                )
+            end
+        end
+    end
+    if self.holdTime > 0 then
+        acc = math.min(
+            acc,
+            v.speed > 0.3 and -math.min(3, 0.8 + v.speed * 0.25) or -1
+        )
+        if v.speed < 0.3 then
+            self.holdTime = self.holdTime - dt
+        end
+        if self.holdKind == "breakdown" then
+            v.lights.hazard = true
+        else
+            v.lights:setIndicator("right")
+        end
+        if self.holdTime <= 0 then
+            if self.holdKind == "breakdown" then
+                v.lights.hazard = false
+            end
+            if self.holdKind == "bus" then
+                self.departSignal = 2.5
+            end
+            self.holdKind = nil
+        end
+    end
+    if self.departSignal > 0 then
+        self.departSignal = self.departSignal - dt
+        v.lights:setIndicator(self.departSignal > 0 and "left" or "off")
+    end
+    if seg.kind == "lane" and self.holdTime <= 0 then
+        self:updatePassing(dt, ctx, seg)
+    end
+    if self.passing ~= nil then
+        params.v0 = math.min(params.v0, 9)
+    end
+    if self.holdTime > 0 and seg.kind == "lane" and seg.right == nil then
+        self.latTarget = -(seg.width * 0.32)
+    elseif self.passing ~= nil then
+        self.latTarget = seg.width + seg.road.medianWidth
+        if self.leader.gap < 6 and self.leader.speed < 1 then
+            acc = math.min(acc, 0.5)
+        end
+    elseif self.yieldEmergency > 0 then
         local lane = seg.kind == "lane" and seg or nil
         if lane ~= nil and lane.right == nil then
             self.latTarget = -(lane.width * 0.42)
@@ -8829,6 +8899,90 @@ function AIDriver.prototype.laneUpdate(self, dt, ctx)
     self:lateral(dt)
     self:updateLights(dt, ctx)
     self:updateWaiting(dt, ctx)
+end
+function AIDriver.prototype.oppositeLane(self, lane)
+    local g = lane.forward and lane.road.lanesBA or lane.road.lanesAB
+    return #g > 0 and g[1] or nil
+end
+function AIDriver.prototype.oncomingClear(self, opp, range)
+    local v = self.v
+    local sOpp = opp.length - v.s
+    do
+        local i = 0
+        while i < opp.occCount do
+            do
+                local __continue113
+                repeat
+                    local e = opp.occ[i + 1]
+                    if e.occ.id == v.id then
+                        __continue113 = true
+                        break
+                    end
+                    if e.s > sOpp - range and e.s < sOpp + 10 then
+                        return false
+                    end
+                    __continue113 = true
+                until true
+                if not __continue113 then
+                    break
+                end
+            end
+            i = i + 1
+        end
+    end
+    if sOpp - range < 0 then
+        for ____, c in ipairs(opp.incoming) do
+            if c.occCount > 0 then
+                return false
+            end
+        end
+    end
+    return true
+end
+function AIDriver.prototype.updatePassing(self, dt, ctx, lane)
+    local v = self.v
+    if self.passing ~= nil then
+        local obs = ctx:vehicle(self.passObstacle)
+        local clearOfIt = obs == nil
+        if obs ~= nil then
+            local along = (obs.x - v.x) * math.cos(v.heading) + (obs.y - v.y) * math.sin(v.heading)
+            clearOfIt = along < -(obs.halfLen + v.halfLen + 4)
+        end
+        local aborting = math.abs(v.lat) < 1.2 and not self:oncomingClear(self.passing, 45)
+        if clearOfIt or aborting or lane.length - v.s < 12 or self.passing.road ~= lane.road then
+            self.passing = nil
+            self.passWait = 0
+        end
+        return
+    end
+    local L = self.leader
+    local ____temp_2
+    if L.id >= 0 then
+        ____temp_2 = ctx:vehicle(L.id)
+    else
+        ____temp_2 = nil
+    end
+    local lead = ____temp_2
+    if lead == nil or L.gap > 14 or L.speed > 0.3 or lane.left ~= nil or L.seg ~= lane then
+        self.passWait = 0
+        return
+    end
+    local ld = ctx:driverOf(lead)
+    local stuck = lead.wrecked or lead.mode == "physics" or ld ~= nil and ld.holdTime > 0
+    local opp = self:oppositeLane(lane)
+    if not stuck or opp == nil or lane.length - v.s < 30 then
+        self.passWait = 0
+        return
+    end
+    self.passWait = self.passWait + dt
+    local patience = lerp(4, 1.5, self.p.aggression)
+    if self.passWait > patience and self:oncomingClear(opp, 90) then
+        self.passing = opp
+        self.passObstacle = lead.id
+        if self.rng:chance(self.p.signalDiscipline) then
+            v.lights:setIndicator("left")
+        end
+    end
 end
 function AIDriver.prototype.ragingThroughLights(self)
     return self.rage ~= nil and (self.rage.behavior == "tailgate" or self.rage.behavior == "chase") and self.emo.anger > 85 and self.p.lawfulness < 0.3
@@ -8969,13 +9123,13 @@ function AIDriver.prototype.laneChanges(self, dt, ctx)
     end
     local good = self:routeLanes(lane)
     if #good > 0 and __TS__ArrayIndexOf(good, lane) < 0 then
-        local ____temp_2
+        local ____temp_3
         if good[1].index < lane.index then
-            ____temp_2 = lane.left
+            ____temp_3 = lane.left
         else
-            ____temp_2 = lane.right
+            ____temp_3 = lane.right
         end
-        local dir = ____temp_2
+        local dir = ____temp_3
         if dir ~= nil then
             self:intend(dir)
         end
@@ -8994,19 +9148,19 @@ function AIDriver.prototype.laneChanges(self, dt, ctx)
     local cands = {lane.left, lane.right}
     for ____, cand in ipairs(cands) do
         do
-            local __continue127
+            local __continue163
             repeat
                 if cand == nil then
-                    __continue127 = true
+                    __continue163 = true
                     break
                 end
                 if #good > 0 and __TS__ArrayIndexOf(good, cand) < 0 and toEnd < 150 then
-                    __continue127 = true
+                    __continue163 = true
                     break
                 end
                 local g = self:evaluateLane(ctx, lane, cand)
                 if g == nil then
-                    __continue127 = true
+                    __continue163 = true
                     break
                 end
                 local bias = cand == lane.right and 0.12 or -0.05
@@ -9017,9 +9171,9 @@ function AIDriver.prototype.laneChanges(self, dt, ctx)
                     bestGain = gain
                     best = cand
                 end
-                __continue127 = true
+                __continue163 = true
             until true
-            if not __continue127 then
+            if not __continue163 then
                 break
             end
         end
@@ -9045,11 +9199,11 @@ function AIDriver.prototype.evaluateLane(self, ctx, lane, cand)
         local i = 0
         while i < cand.occCount do
             do
-                local __continue137
+                local __continue173
                 repeat
                     local e = cand.occ[i + 1]
                     if e.occ.id == v.id then
-                        __continue137 = true
+                        __continue173 = true
                         break
                     end
                     if e.s >= sT then
@@ -9059,9 +9213,9 @@ function AIDriver.prototype.evaluateLane(self, ctx, lane, cand)
                     elseif fol == nil or e.s > fol.s then
                         fol = {s = e.s, v = e.v, len = e.occ.length, id = e.occ.id}
                     end
-                    __continue137 = true
+                    __continue173 = true
                 until true
-                if not __continue137 then
+                if not __continue173 then
                     break
                 end
             end
@@ -9074,20 +9228,20 @@ function AIDriver.prototype.evaluateLane(self, ctx, lane, cand)
                 local i = 0
                 while i < c.occCount do
                     do
-                        local __continue144
+                        local __continue180
                         repeat
                             local e = c.occ[i + 1]
                             if e.occ.id == v.id then
-                                __continue144 = true
+                                __continue180 = true
                                 break
                             end
                             local s = e.s - c.length
                             if fol == nil or s > fol.s then
                                 fol = {s = s, v = e.v, len = e.occ.length, id = e.occ.id}
                             end
-                            __continue144 = true
+                            __continue180 = true
                         until true
-                        if not __continue144 then
+                        if not __continue180 then
                             break
                         end
                     end
@@ -9228,7 +9382,7 @@ function AIDriver.prototype.updateLights(self, dt, ctx)
     lights.brake = (self.lastAccel < -0.6 or v.speed < 0.2 and self.stopDist < 20 or v.speed < 0.2 and self.leader.gap < 8) and 1 or 0
     lights.reverse = false
     if self.state == "drive" and not v.wrecked then
-        lights.hazard = self.yieldEmergency > 0 and v.speed < 1 and self.p.lawfulness > 0.8
+        lights.hazard = self.holdKind == "breakdown" or self.yieldEmergency > 0 and v.speed < 1 and self.p.lawfulness > 0.8
     end
     if self.lcIntent == nil then
         local want = self:turnSignalWanted()
@@ -9289,13 +9443,13 @@ function AIDriver.prototype.flashHighBeams(self, ctx)
     self.flashTimer = 1
     self.flashCount = self.flashCount + 1
     ctx.events:emit({type = "flash", vehicle = self.v.id})
-    local ____temp_3
+    local ____temp_4
     if self.leader.id >= 0 then
-        ____temp_3 = ctx:vehicle(self.leader.id)
+        ____temp_4 = ctx:vehicle(self.leader.id)
     else
-        ____temp_3 = nil
+        ____temp_4 = nil
     end
-    local leader = ____temp_3
+    local leader = ____temp_4
     if leader ~= nil and self.leader.gap < 40 then
         ctx:offend(self.v, leader, "high_beams", 1)
     end
@@ -9342,13 +9496,13 @@ function AIDriver.prototype.detectOffenses(self, dt, ctx)
     end
     self.prevLeaderId = L.id
     self.prevLeaderGap = L.gap
-    local ____temp_4
+    local ____temp_5
     if L.id >= 0 then
-        ____temp_4 = ctx:vehicle(L.id)
+        ____temp_5 = ctx:vehicle(L.id)
     else
-        ____temp_4 = nil
+        ____temp_5 = nil
     end
-    local leaderVeh = ____temp_4
+    local leaderVeh = ____temp_5
     if leaderVeh ~= nil and L.gap < 12 and L.speed < 0.3 and v.speed < 0.3 and not self:leaderHasReason(ctx, leaderVeh) then
         self.blockedTime = self.blockedTime + dt
         local limit = 2.5 + self.p.patience * 5
@@ -9374,6 +9528,9 @@ end
 function AIDriver.prototype.leaderHasReason(self, ctx, lead)
     local d = ctx:driverOf(lead)
     if d ~= nil then
+        if d.holdTime > 0 then
+            return true
+        end
         if d.stopDist < 8 then
             return true
         end
@@ -9381,13 +9538,13 @@ function AIDriver.prototype.leaderHasReason(self, ctx, lead)
             return true
         end
         if d.state ~= "drive" then
-            local ____temp_5
+            local ____temp_6
             if d.state == "crashed" then
-                ____temp_5 = false
+                ____temp_6 = false
             else
-                ____temp_5 = true
+                ____temp_6 = true
             end
-            return ____temp_5
+            return ____temp_6
         end
         return d.yieldEmergency > 0
     end
@@ -9435,17 +9592,17 @@ function AIDriver.prototype.checkEmergencyBehind(self, dt, ctx)
     local hs = math.sin(v.heading)
     for ____, e in ipairs(ctx.vehicles) do
         do
-            local __continue221
+            local __continue258
             repeat
                 if not e:sirenOn() or e == v or not e.alive then
-                    __continue221 = true
+                    __continue258 = true
                     break
                 end
                 local dx = e.x - v.x
                 local dy = e.y - v.y
                 local d2 = dx * dx + dy * dy
                 if d2 > 80 * 80 then
-                    __continue221 = true
+                    __continue258 = true
                     break
                 end
                 local behind = dx * hc + dy * hs < -2
@@ -9454,9 +9611,9 @@ function AIDriver.prototype.checkEmergencyBehind(self, dt, ctx)
                     self.yieldEmergency = 2.5
                     return
                 end
-                __continue221 = true
+                __continue258 = true
             until true
-            if not __continue221 then
+            if not __continue258 then
                 break
             end
         end
@@ -9504,13 +9661,13 @@ function AIDriver.prototype.updateRage(self, dt, ctx)
         end
         local behavior = "tailgate"
         local tgtDriver = ctx:driverOf(tgt)
-        local ____temp_6
+        local ____temp_7
         if tgtDriver ~= nil then
-            ____temp_6 = tgtDriver.leader.id == v.id
+            ____temp_7 = tgtDriver.leader.id == v.id
         else
-            ____temp_6 = self:isBehind(tgt)
+            ____temp_7 = self:isBehind(tgt)
         end
-        local targetBehindMe = ____temp_6
+        local targetBehindMe = ____temp_7
         if targetBehindMe then
             behavior = "brake_check"
         elseif self.leader.id ~= tgt.id and self.p.aggression > 0.8 then
@@ -9565,13 +9722,13 @@ function AIDriver.prototype.updateRage(self, dt, ctx)
         return self:endRage(ctx, "police nearby")
     end
     local tgtDriver = ctx:driverOf(tgt)
-    local ____temp_7
+    local ____temp_8
     if tgtDriver ~= nil then
-        ____temp_7 = tgtDriver.leader.id == v.id and tgtDriver.leader.gap < 18
+        ____temp_8 = tgtDriver.leader.id == v.id and tgtDriver.leader.gap < 18
     else
-        ____temp_7 = self:isBehind(tgt) and dist < 18
+        ____temp_8 = self:isBehind(tgt) and dist < 18
     end
-    local targetBehindMe = ____temp_7
+    local targetBehindMe = ____temp_8
     if rage.behavior == "tailgate" then
         if self.leader.id == rage.target and self.rng:chance(dt * 0.5) then
             self:flashHighBeams(ctx)
@@ -9641,9 +9798,9 @@ function AIDriver.prototype.physicsUpdate(self, dt, ctx)
         return
     end
     repeat
-        local ____switch267 = self.state
-        local ____cond267 = ____switch267 == "crashed"
-        if ____cond267 then
+        local ____switch304 = self.state
+        local ____cond304 = ____switch304 == "crashed"
+        if ____cond304 then
             do
                 brakeToStop(v, true)
                 if v.physicsTime > 1 then
@@ -9669,8 +9826,8 @@ function AIDriver.prototype.physicsUpdate(self, dt, ctx)
                 return
             end
         end
-        ____cond267 = ____cond267 or ____switch267 == "chasing"
-        if ____cond267 then
+        ____cond304 = ____cond304 or ____switch304 == "chasing"
+        if ____cond304 then
             do
                 local rage = self.rage
                 if rage == nil then
@@ -9706,8 +9863,8 @@ function AIDriver.prototype.physicsUpdate(self, dt, ctx)
                 return
             end
         end
-        ____cond267 = ____cond267 or ____switch267 == "recovering"
-        if ____cond267 then
+        ____cond304 = ____cond304 or ____switch304 == "recovering"
+        if ____cond304 then
             self:recoverUpdate(dt, ctx)
             return
         end
@@ -9727,10 +9884,10 @@ function AIDriver.prototype.recoverUpdate(self, dt, ctx)
         local bestScore = math.huge
         for ____, h in ipairs(hits) do
             do
-                local __continue282
+                local __continue319
                 repeat
                     if h.s > h.lane.length - 15 then
-                        __continue282 = true
+                        __continue319 = true
                         break
                     end
                     local ang = math.abs(angleDiff(
@@ -9742,9 +9899,9 @@ function AIDriver.prototype.recoverUpdate(self, dt, ctx)
                         bestScore = score
                         best = h
                     end
-                    __continue282 = true
+                    __continue319 = true
                 until true
-                if not __continue282 then
+                if not __continue319 then
                     break
                 end
             end
@@ -12574,6 +12731,7 @@ function Spawner.prototype.____constructor(self, host, opts)
     self.host = host
     self.opts = opts
     self.timer = 0
+    self.enabled = true
 end
 function Spawner.prototype.pickClass(self)
     local entries = __TS__ArrayMap(
@@ -12706,6 +12864,9 @@ function Spawner.prototype.populate(self, density)
     end
 end
 function Spawner.prototype.update(self, dt, density)
+    if not self.enabled then
+        return
+    end
     self.timer = self.timer - dt
     if self.timer > 0 then
         return
@@ -12725,10 +12886,10 @@ function Spawner.prototype.update(self, dt, density)
     local target = math.floor(self.opts.civilians * density)
     for ____, v in ipairs(h.vehicles) do
         do
-            local __continue28
+            local __continue29
             repeat
                 if v.isPlayer or h.busyUnit(v) then
-                    __continue28 = true
+                    __continue29 = true
                     break
                 end
                 local ____temp_0
@@ -12745,9 +12906,9 @@ function Spawner.prototype.update(self, dt, density)
                     h.remove(v)
                     return
                 end
-                __continue28 = true
+                __continue29 = true
             until true
-            if not __continue28 then
+            if not __continue29 then
                 break
             end
         end
@@ -13002,6 +13163,11 @@ function World.prototype.____constructor(self, opts)
         return n
     end
     self.observations = {}
+    self.breakdownInterval = 80
+    self.outageInterval = 300
+    self.breakdownTimer = 45
+    self.outageTimer = 150
+    self.outages = {}
     self.pedHost = {
         signals = self.signals,
         trafficApproaching = function(x, y, radius, seconds)
@@ -13557,6 +13723,7 @@ function World.prototype.step(self, dt)
         end
     end
     self:updatePedestrians(dt)
+    self:updateIncidents(dt)
     self:physics(dt)
     self:collisions()
     self:lawAndOrder(dt)
@@ -13628,6 +13795,17 @@ function World.prototype.rebuildOccupancy(self)
                             )
                         end
                         local d = self.drivers:get(v.id)
+                        if d ~= nil and d.passing ~= nil and math.abs(v.lat) > 1.2 and seg.kind == "lane" then
+                            local opp = d.passing
+                            addOccupant(
+                                opp,
+                                v,
+                                opp.length - v.s,
+                                -v.speed,
+                                true,
+                                0
+                            )
+                        end
                         if d ~= nil and d.shadowLane ~= nil and seg.kind == "lane" then
                             local sh = d.shadowLane
                             local sS = v.s * sh.length / seg.length
@@ -13661,17 +13839,17 @@ function World.prototype.registerFreeBody(self, v)
     local sh = math.sin(v.heading)
     for ____, h in ipairs(self.laneHits) do
         do
-            local __continue128
+            local __continue129
             repeat
                 local lh = h.lane.path:headingAt(h.s)
                 local rel = math.abs(math.sin(v.heading - lh))
                 local halfAcross = v.halfWid * (1 - rel) + v.halfLen * rel
                 if math.abs(h.lateral) > h.lane.width / 2 + halfAcross - 0.3 then
-                    __continue128 = true
+                    __continue129 = true
                     break
                 end
                 if h.s < -v.halfLen or h.s > h.lane.length + v.halfLen then
-                    __continue128 = true
+                    __continue129 = true
                     break
                 end
                 local vAlong = v:vx() * math.cos(lh) + v:vy() * math.sin(lh)
@@ -13683,9 +13861,9 @@ function World.prototype.registerFreeBody(self, v)
                     true,
                     h.lateral
                 )
-                __continue128 = true
+                __continue129 = true
             until true
-            if not __continue128 then
+            if not __continue129 then
                 break
             end
         end
@@ -13695,15 +13873,15 @@ function World.prototype.registerFreeBody(self, v)
     local pr = {s = 0, lateral = 0, d2 = 0}
     for ____, c in ipairs(self.connHits) do
         do
-            local __continue132
+            local __continue133
             repeat
                 c.path:project(v.x, v.y, pr)
                 if pr.d2 > 2.6 * 2.6 then
-                    __continue132 = true
+                    __continue133 = true
                     break
                 end
                 if pr.s <= 0.01 and pr.d2 > 1 then
-                    __continue132 = true
+                    __continue133 = true
                     break
                 end
                 local lh = c.path:headingAt(pr.s)
@@ -13716,9 +13894,9 @@ function World.prototype.registerFreeBody(self, v)
                     true,
                     pr.lateral
                 )
-                __continue132 = true
+                __continue133 = true
             until true
-            if not __continue132 then
+            if not __continue133 then
                 break
             end
         end
@@ -13791,17 +13969,17 @@ function World.prototype.gesture(self, p, kind)
     self.events:emit({type = "gesture", from = p.id, kind = kind})
     for ____, v in ipairs(self.vehicles) do
         do
-            local __continue155
+            local __continue156
             repeat
                 local d = self.drivers:get(v.id)
                 if d == nil then
-                    __continue155 = true
+                    __continue156 = true
                     break
                 end
                 local dist = hypot(v.x - p.x, v.y - p.y)
                 if kind == "wave" and dist < 45 then
                     if d.emo:grudgeAgainst(p.id) <= 0 then
-                        __continue155 = true
+                        __continue156 = true
                         break
                     end
                     local calmed = d.emo:apologize(p.id, self.time)
@@ -13815,14 +13993,14 @@ function World.prototype.gesture(self, p, kind)
                     if d.p.archetype == "zen" then
                         d.speechCooldown = 0
                         d:say(self, "Have a nice day!")
-                        __continue155 = true
+                        __continue156 = true
                         break
                     end
                     self:offend(p, v, "rude_gesture", 1)
                 end
-                __continue155 = true
+                __continue156 = true
             until true
-            if not __continue155 then
+            if not __continue156 then
                 break
             end
         end
@@ -13831,25 +14009,25 @@ end
 function World.prototype.thankYouBlink(self, p)
     for ____, v in ipairs(self.vehicles) do
         do
-            local __continue163
+            local __continue164
             repeat
                 local d = self.drivers:get(v.id)
                 if d == nil or d.emo:grudgeAgainst(p.id) <= 0 then
-                    __continue163 = true
+                    __continue164 = true
                     break
                 end
                 local dx = v.x - p.x
                 local dy = v.y - p.y
                 local behind = dx * math.cos(p.heading) + dy * math.sin(p.heading) < 0
                 if not behind or dx * dx + dy * dy > 50 * 50 then
-                    __continue163 = true
+                    __continue164 = true
                     break
                 end
                 local calmed = d.emo:apologize(p.id, self.time) * 0.6
                 self.events:emit({type = "apology", from = p.id, to = v.id, calmed = calmed})
-                __continue163 = true
+                __continue164 = true
             until true
-            if not __continue163 then
+            if not __continue164 then
                 break
             end
         end
@@ -13858,34 +14036,34 @@ end
 function World.prototype.flashAhead(self, p)
     for ____, v in ipairs(self.vehicles) do
         do
-            local __continue168
+            local __continue169
             repeat
                 if v == p then
-                    __continue168 = true
+                    __continue169 = true
                     break
                 end
                 local dx = v.x - p.x
                 local dy = v.y - p.y
                 local fwd = dx * math.cos(p.heading) + dy * math.sin(p.heading)
                 if fwd < 0 or fwd > 45 then
-                    __continue168 = true
+                    __continue169 = true
                     break
                 end
                 local side = math.abs(-dx * math.sin(p.heading) + dy * math.cos(p.heading))
                 if side > 3 + fwd * 0.15 then
-                    __continue168 = true
+                    __continue169 = true
                     break
                 end
                 local last = self.flashMemo:get(v.id) or -10
                 if self.time - last < 1.5 then
-                    __continue168 = true
+                    __continue169 = true
                     break
                 end
                 self.flashMemo:set(v.id, self.time)
                 self:offend(p, v, "high_beams", 1)
-                __continue168 = true
+                __continue169 = true
             until true
-            if not __continue168 then
+            if not __continue169 then
                 break
             end
         end
@@ -13897,11 +14075,11 @@ function World.prototype.physics(self, dt)
         local i = 0
         while i < #self.vehicles do
             do
-                local __continue175
+                local __continue176
                 repeat
                     local v = self.vehicles[i + 1]
                     if v.mode ~= "physics" then
-                        __continue175 = true
+                        __continue176 = true
                         break
                     end
                     local pt = v.pt
@@ -13954,9 +14132,9 @@ function World.prototype.physics(self, dt)
                             self.record:driveClean(dyn:absSpeed() * dt)
                         end
                     end
-                    __continue175 = true
+                    __continue176 = true
                 until true
-                if not __continue175 then
+                if not __continue176 then
                     break
                 end
             end
@@ -13967,11 +14145,11 @@ function World.prototype.physics(self, dt)
         local i = 0
         while i < #self.vehicles do
             do
-                local __continue182
+                local __continue183
                 repeat
                     local v = self.vehicles[i + 1]
                     if v.mode ~= "lane" then
-                        __continue182 = true
+                        __continue183 = true
                         break
                     end
                     local spec = v.spec
@@ -13984,9 +14162,9 @@ function World.prototype.physics(self, dt)
                     end
                     v.gearEstimate = g
                     v.rpmEstimate = math.max(spec.idleRpm, wheel * spec.gears[g]) + math.max(0, v.accel) * 300
-                    __continue182 = true
+                    __continue183 = true
                 until true
-                if not __continue182 then
+                if not __continue183 then
                     break
                 end
             end
@@ -14005,26 +14183,26 @@ function World.prototype.collisions(self)
         local i = 0
         while i < #self.vehicles do
             do
-                local __continue190
+                local __continue191
                 repeat
                     local a = self.vehicles[i + 1]
                     if not a.alive then
-                        __continue190 = true
+                        __continue191 = true
                         break
                     end
                     self.queryBuf = {}
                     self.vehicleHash:query(a.x, a.y, a.halfLen + 2, self.queryBuf)
                     for ____, b in ipairs(self.queryBuf) do
                         do
-                            local __continue192
+                            local __continue193
                             repeat
                                 if b.id <= a.id or not b.alive then
-                                    __continue192 = true
+                                    __continue193 = true
                                     break
                                 end
                                 if a.mode == "lane" and b.mode == "lane" then
                                     if not lanePairCanCollide(a, b) then
-                                        __continue192 = true
+                                        __continue193 = true
                                         break
                                     end
                                     local shrink = 0.85
@@ -14035,13 +14213,13 @@ function World.prototype.collisions(self)
                                     setBox(boxB, b, 1)
                                 end
                                 if not boxContact(boxA, boxB, contact) then
-                                    __continue192 = true
+                                    __continue193 = true
                                     break
                                 end
                                 self:resolveVehicles(a, b)
-                                __continue192 = true
+                                __continue193 = true
                             until true
-                            if not __continue192 then
+                            if not __continue193 then
                                 break
                             end
                         end
@@ -14049,9 +14227,9 @@ function World.prototype.collisions(self)
                     if a.mode == "physics" then
                         self:staticCollisions(a)
                     end
-                    __continue190 = true
+                    __continue191 = true
                 until true
-                if not __continue190 then
+                if not __continue191 then
                     break
                 end
             end
@@ -14177,11 +14355,11 @@ function World.prototype.staticCollisions(self, v)
     self.obstacleHash:query(v.x, v.y, v.halfLen + 1, self.obstacleBuf)
     for ____, o in ipairs(self.obstacleBuf) do
         do
-            local __continue216
+            local __continue217
             repeat
                 setBox(boxA, v, 1)
                 if not boxContact(boxA, o, contact) then
-                    __continue216 = true
+                    __continue217 = true
                     break
                 end
                 local j = resolveStatic(v.dyn, contact, 0.12, 0.5)
@@ -14203,9 +14381,9 @@ function World.prototype.staticCollisions(self, v)
                         d:onCrash(self, sev)
                     end
                 end
-                __continue216 = true
+                __continue217 = true
             until true
-            if not __continue216 then
+            if not __continue217 then
                 break
             end
         end
@@ -14354,16 +14532,16 @@ function World.prototype.playerSocial(self, dt, p)
             local i = 0
             while i < lane.occCount do
                 do
-                    local __continue249
+                    local __continue250
                     repeat
                         local e = lane.occ[i + 1]
                         if e.occ.id == p.id then
-                            __continue249 = true
+                            __continue250 = true
                             break
                         end
                         local v = self.byId:get(e.occ.id)
                         if v == nil then
-                            __continue249 = true
+                            __continue250 = true
                             break
                         end
                         local d = (v.x - p.x) * math.cos(p.heading) + (v.y - p.y) * math.sin(p.heading)
@@ -14371,9 +14549,9 @@ function World.prototype.playerSocial(self, dt, p)
                             best = d
                             leader = v
                         end
-                        __continue249 = true
+                        __continue250 = true
                     until true
-                    if not __continue249 then
+                    if not __continue250 then
                         break
                     end
                 end
@@ -14395,10 +14573,10 @@ function World.prototype.playerSocial(self, dt, p)
         self.vehicleHash:query(p.x, p.y, 6, self.queryBuf)
         for ____, v in ipairs(self.queryBuf) do
             do
-                local __continue257
+                local __continue258
                 repeat
                     if v == p then
-                        __continue257 = true
+                        __continue258 = true
                         break
                     end
                     local d = hypot(v.x - p.x, v.y - p.y) - (v.halfWid + p.halfWid)
@@ -14409,7 +14587,7 @@ function World.prototype.playerSocial(self, dt, p)
                     if d < 1.2 and rel > 7 then
                         local last = self.nearMissMemo:get(v.id) or -10
                         if self.time - last < 3 then
-                            __continue257 = true
+                            __continue258 = true
                             break
                         end
                         self.nearMissMemo:set(v.id, self.time)
@@ -14421,12 +14599,126 @@ function World.prototype.playerSocial(self, dt, p)
                             clamp(rel / 12, 0.5, 2)
                         )
                     end
-                    __continue257 = true
+                    __continue258 = true
                 until true
-                if not __continue257 then
+                if not __continue258 then
                     break
                 end
             end
+        end
+    end
+end
+function World.prototype.updateIncidents(self, dt)
+    local p = self.player
+    if self.breakdownInterval > 0 then
+        self.breakdownTimer = self.breakdownTimer - dt
+        if self.breakdownTimer <= 0 then
+            self.breakdownTimer = self.rng:range(self.breakdownInterval * 0.6, self.breakdownInterval * 1.4)
+            local cands = {}
+            for ____, v in ipairs(self.vehicles) do
+                do
+                    local __continue266
+                    repeat
+                        if v.role ~= "civilian" or v.mode ~= "lane" or v.seg == nil or v.seg.kind ~= "lane" or v.speed < 3 then
+                            __continue266 = true
+                            break
+                        end
+                        if v.s < 15 or v.seg.length - v.s < 35 then
+                            __continue266 = true
+                            break
+                        end
+                        local d = self.drivers:get(v.id)
+                        if d == nil or d.holdTime > 0 or d.rage ~= nil then
+                            __continue266 = true
+                            break
+                        end
+                        if p ~= nil then
+                            local dist = hypot(v.x - p.x, v.y - p.y)
+                            if dist < 50 or dist > 300 then
+                                __continue266 = true
+                                break
+                            end
+                        end
+                        cands[#cands + 1] = v
+                        __continue266 = true
+                    until true
+                    if not __continue266 then
+                        break
+                    end
+                end
+            end
+            if #cands > 0 then
+                local v = self.rng:pick(cands)
+                local d = self.drivers:get(v.id)
+                d:hold(
+                    "breakdown",
+                    self.rng:range(40, 90)
+                )
+                self.events:emit({
+                    type = "incident",
+                    kind = "breakdown",
+                    x = v.x,
+                    y = v.y,
+                    vehicle = v.id,
+                    node = -1,
+                    where = v.seg.road.name
+                })
+            end
+        end
+    end
+    if self.outageInterval > 0 and #self.signals > 0 then
+        self.outageTimer = self.outageTimer - dt
+        if self.outageTimer <= 0 then
+            self.outageTimer = self.rng:range(self.outageInterval * 0.6, self.outageInterval * 1.4)
+            local sig = self.rng:pick(self.signals)
+            if sig.mode ~= "off" and sig.mode ~= "flashing" then
+                sig:setMode("off")
+                local ____self_outages_35 = self.outages
+                ____self_outages_35[#____self_outages_35 + 1] = {
+                    sig = sig,
+                    ["until"] = self.time + self.rng:range(80, 140)
+                }
+                self.events:emit({
+                    type = "incident",
+                    kind = "power_cut",
+                    x = sig.node.x,
+                    y = sig.node.y,
+                    vehicle = -1,
+                    node = sig.node.id,
+                    where = sig.node.name
+                })
+            end
+        end
+    end
+    do
+        local i = #self.outages - 1
+        while i >= 0 do
+            do
+                local __continue277
+                repeat
+                    local o = self.outages[i + 1]
+                    if self.time < o["until"] then
+                        __continue277 = true
+                        break
+                    end
+                    o.sig:setMode("actuated")
+                    __TS__ArraySplice(self.outages, i, 1)
+                    self.events:emit({
+                        type = "incident",
+                        kind = "power_restored",
+                        x = o.sig.node.x,
+                        y = o.sig.node.y,
+                        vehicle = -1,
+                        node = o.sig.node.id,
+                        where = o.sig.node.name
+                    })
+                    __continue277 = true
+                until true
+                if not __continue277 then
+                    break
+                end
+            end
+            i = i - 1
         end
     end
 end
@@ -14436,10 +14728,10 @@ function World.prototype.updatePedestrians(self, dt)
     self.peds:update(dt, self.pedHost)
     for ____, ped in ipairs(self.peds.peds) do
         do
-            local __continue263
+            local __continue280
             repeat
                 if ped.state ~= "crossing" and ped.state ~= "waiting" then
-                    __continue263 = true
+                    __continue280 = true
                     break
                 end
                 self.queryBuf = {}
@@ -14486,9 +14778,9 @@ function World.prototype.updatePedestrians(self, dt)
                         end
                     end
                 end
-                __continue263 = true
+                __continue280 = true
             until true
-            if not __continue263 then
+            if not __continue280 then
                 break
             end
         end
@@ -14582,20 +14874,20 @@ function World.prototype.angryAtPlayer(self)
     end
     for ____, v in ipairs(self.vehicles) do
         do
-            local __continue292
+            local __continue309
             repeat
                 local d = self.drivers:get(v.id)
                 if d == nil then
-                    __continue292 = true
+                    __continue309 = true
                     break
                 end
                 local g = d.emo:grudgeAgainst(p.id)
                 if g > 10 and hypot(v.x - p.x, v.y - p.y) < 120 then
                     out[#out + 1] = {vehicle = v, anger = d.emo.anger, raging = d.rage ~= nil and d.rage.target == p.id}
                 end
-                __continue292 = true
+                __continue309 = true
             until true
-            if not __continue292 then
+            if not __continue309 then
                 break
             end
         end

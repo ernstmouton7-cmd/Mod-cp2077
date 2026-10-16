@@ -35,6 +35,8 @@ export interface PopulationOptions {
  */
 export class Spawner {
   private timer = 0;
+  /** Population control on/off (scripted scenarios turn it off). */
+  enabled = true;
 
   constructor(
     readonly host: SpawnHost,
@@ -106,6 +108,7 @@ export class Spawner {
   }
 
   update(dt: number, density: number): void {
+    if (!this.enabled) return;
     this.timer -= dt;
     if (this.timer > 0) return;
     this.timer = 0.5;

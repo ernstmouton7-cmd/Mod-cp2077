@@ -210,6 +210,10 @@ export class Menu {
     bind("setTraffic", "input", (el) => (this.world.spawner.opts.civilians = Number(el.value)));
     bind("setPolice", "input", (el) => (this.world.spawner.opts.police = Number(el.value)));
     bind("setVolume", "input", (el) => (this.settings.volume = Number(el.value)));
+    bind("setIncidents", "change", (el) => {
+      this.world.breakdownInterval = el.checked ? 80 : 0;
+      this.world.outageInterval = el.checked ? 300 : 0;
+    });
     bind("setBloom", "change", (el) => (this.settings.bloom = el.checked));
     bind("setQuality", "change", (el) => (this.settings.quality = el.value as "high" | "low"));
     bind("setSignals", "change", (el) => {
@@ -248,6 +252,7 @@ export class Menu {
     set("setTraffic", `${this.world.spawner.opts.civilians}`);
     set("setPolice", `${this.world.spawner.opts.police}`);
     set("setVolume", `${this.settings.volume}`);
+    set("setIncidents", this.world.breakdownInterval > 0);
     set("setBloom", this.settings.bloom);
     set("setQuality", this.settings.quality);
     const s0 = this.world.signals[0];

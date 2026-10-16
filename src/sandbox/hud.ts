@@ -200,6 +200,13 @@ export class Hud {
       case "ped_speech":
         if (p !== undefined && Math.hypot(e.x - p.x, e.y - p.y) < 50) this.pedSpeech(e.x, e.y, e.text);
         break;
+      case "incident": {
+        const d = p !== undefined ? Math.hypot(e.x - p.x, e.y - p.y) : 0;
+        if (e.kind === "breakdown" && d < 320) this.toast(`Breakdown on ${e.where}`, "info", "Hazards on: pass with care");
+        else if (e.kind === "power_cut") this.toast(`Power cut at ${e.where}`, "violation", "Signals dark: treat it as an all-way stop");
+        else if (e.kind === "power_restored" && d < 400) this.toast(`Signals back on at ${e.where}`, "good");
+        break;
+      }
       case "ped_hit":
         if (e.vehicle === me) this.toast("You hit a pedestrian", "violation", "An ambulance is on the way");
         break;
@@ -221,7 +228,8 @@ export class Hud {
     const box = $("nextJunction");
     box.hidden = control === "none";
     if (control === "none") return;
-    this.setText("njKind", control === "signal" ? "Signal" : control === "stop" ? "Stop sign" : "Yield");
+    const dark = control === "signal" && head !== undefined && head.ball === "off" && !head.ballFlashing;
+    this.setText("njKind", dark ? "Signal out: all-way stop" : control === "signal" ? "Signal" : control === "stop" ? "Stop sign" : "Yield");
     this.setText("njDist", `${Math.round(distance)} m`);
     this.setText("njName", nodeName);
     $("njCam").hidden = !camera;

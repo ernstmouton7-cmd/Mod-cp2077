@@ -95,6 +95,15 @@ export class AIDriver implements DriverView {
   followGap = 10;
   /** Police override: drive (on roads) toward this point. */
   headFor: { x: number; y: number } | undefined = undefined;
+  /** Stopped at the curb on purpose (breakdown, bus stop): seconds left once stopped. */
+  holdTime = 0;
+  holdKind: "breakdown" | "bus" | undefined = undefined;
+  private busStopLane = -1;
+  private departSignal = 0;
+  /** Overtaking a stopped vehicle through the oncoming lane. */
+  passing: Lane | undefined = undefined;
+  private passObstacle = -1;
+  private passWait = 0;
 
   constructor(
     readonly v: Vehicle,
@@ -120,9 +129,18 @@ export class AIDriver implements DriverView {
     return this.rng.next();
   }
 
+  /** Pull over and stop for a while (breakdown or bus stop). */
+  hold(kind: "breakdown" | "bus", seconds: number): void {
+    this.holdKind = kind;
+    this.holdTime = seconds;
+    this.lcIntent = undefined;
+  }
+
   /** Short description for debug overlays. */
   status(): string {
     if (this.state !== "drive") return this.state;
+    if (this.holdTime > 0) return this.holdKind === "bus" ? "bus stop" : "broken down";
+    if (this.passing !== undefined) return "overtaking";
     if (this.rage !== undefined) return `RAGE:${this.rage.behavior}`;
     if (this.distraction > 0) return "distracted";
     if (this.yieldEmergency > 0) return "yield-emergency";
@@ -404,8 +422,41 @@ export class AIDriver implements DriverView {
       acc = Math.min(acc, idmAccel(v.speed, this.stopDist, v.speed, stopParams));
     }
 
+    // --- Bus stops mid-block on the curb lane.
+    if (v.spec.id === "bus" && seg.kind === "lane" && this.holdTime <= 0) {
+      const lane = seg as Lane;
+      if (lane.right === undefined && lane.length > 60 && this.busStopLane !== lane.id && v.s > lane.length * 0.45 && v.s < lane.length * 0.6) {
+        this.busStopLane = lane.id;
+        if (this.rng.chance(0.7)) this.hold("bus", this.rng.range(7, 14));
+      }
+    }
+    // --- Holds: brake gently to the curb, then wait.
+    if (this.holdTime > 0) {
+      acc = Math.min(acc, v.speed > 0.3 ? -Math.min(3, 0.8 + v.speed * 0.25) : -1);
+      if (v.speed < 0.3) this.holdTime -= dt;
+      if (this.holdKind === "breakdown") v.lights.hazard = true;
+      else v.lights.setIndicator("right");
+      if (this.holdTime <= 0) {
+        if (this.holdKind === "breakdown") v.lights.hazard = false;
+        if (this.holdKind === "bus") this.departSignal = 2.5;
+        this.holdKind = undefined;
+      }
+    }
+    if (this.departSignal > 0) {
+      this.departSignal -= dt;
+      v.lights.setIndicator(this.departSignal > 0 ? "left" : "off");
+    }
+    // --- Overtake stopped vehicles through the oncoming lane (single-lane roads).
+    if (seg.kind === "lane" && this.holdTime <= 0) this.updatePassing(dt, ctx, seg as Lane);
+    if (this.passing !== undefined) params.v0 = Math.min(params.v0, 9);
+
     // --- Pull over for emergency vehicles.
-    if (this.yieldEmergency > 0) {
+    if (this.holdTime > 0 && seg.kind === "lane" && (seg as Lane).right === undefined) {
+      this.latTarget = -((seg as Lane).width * 0.32);
+    } else if (this.passing !== undefined) {
+      this.latTarget = (seg as Lane).width + (seg as Lane).road.medianWidth;
+      if (this.leader.gap < 6 && this.leader.speed < 1) acc = Math.min(acc, 0.5);
+    } else if (this.yieldEmergency > 0) {
       const lane = seg.kind === "lane" ? (seg as Lane) : undefined;
       if (lane !== undefined && lane.right === undefined) this.latTarget = -(lane.width * 0.42);
       acc = Math.min(acc, v.speed > 2 ? -2.5 : -0.5);
@@ -427,6 +478,66 @@ export class AIDriver implements DriverView {
     this.lateral(dt);
     this.updateLights(dt, ctx);
     this.updateWaiting(dt, ctx);
+  }
+
+  /** The innermost lane of the opposite direction, if the road is two-way. */
+  private oppositeLane(lane: Lane): Lane | undefined {
+    const g = lane.forward ? lane.road.lanesBA : lane.road.lanesAB;
+    return g.length > 0 ? g[0] : undefined;
+  }
+
+  /** No oncoming vehicle within `range` metres of our position on the opposite lane. */
+  private oncomingClear(opp: Lane, range: number): boolean {
+    const v = this.v;
+    const sOpp = opp.length - v.s;
+    for (let i = 0; i < opp.occCount; i++) {
+      const e = opp.occ[i];
+      if (e.occ.id === v.id) continue;
+      if (e.s > sOpp - range && e.s < sOpp + 10) return false;
+    }
+    // Something about to enter the opposite lane from the junction behind it?
+    if (sOpp - range < 0) {
+      for (const c of opp.incoming) if (c.occCount > 0) return false;
+    }
+    return true;
+  }
+
+  private updatePassing(dt: number, ctx: SimContext, lane: Lane): void {
+    const v = this.v;
+    if (this.passing !== undefined) {
+      const obs = ctx.vehicle(this.passObstacle);
+      let clearOfIt = obs === undefined;
+      if (obs !== undefined) {
+        const along = (obs.x - v.x) * Math.cos(v.heading) + (obs.y - v.y) * Math.sin(v.heading);
+        clearOfIt = along < -(obs.halfLen + v.halfLen + 4);
+      }
+      const aborting = Math.abs(v.lat) < 1.2 && !this.oncomingClear(this.passing, 45);
+      if (clearOfIt || aborting || lane.length - v.s < 12 || this.passing.road !== lane.road) {
+        this.passing = undefined;
+        this.passWait = 0;
+      }
+      return;
+    }
+    const L = this.leader;
+    const lead = L.id >= 0 ? ctx.vehicle(L.id) : undefined;
+    if (lead === undefined || L.gap > 14 || L.speed > 0.3 || lane.left !== undefined || L.seg !== lane) {
+      this.passWait = 0;
+      return;
+    }
+    const ld = ctx.driverOf(lead);
+    const stuck = lead.wrecked || lead.mode === "physics" || (ld !== undefined && ld.holdTime > 0);
+    const opp = this.oppositeLane(lane);
+    if (!stuck || opp === undefined || lane.length - v.s < 30) {
+      this.passWait = 0;
+      return;
+    }
+    this.passWait += dt;
+    const patience = lerp(4, 1.5, this.p.aggression);
+    if (this.passWait > patience && this.oncomingClear(opp, 90)) {
+      this.passing = opp;
+      this.passObstacle = lead.id;
+      if (this.rng.chance(this.p.signalDiscipline)) v.lights.setIndicator("left");
+    }
   }
 
   private ragingThroughLights(): boolean {
@@ -696,7 +807,7 @@ export class AIDriver implements DriverView {
     const lights = v.lights;
     lights.brake = this.lastAccel < -0.6 || (v.speed < 0.2 && this.stopDist < 20) || (v.speed < 0.2 && this.leader.gap < 8) ? 1 : 0;
     lights.reverse = false;
-    if (this.state === "drive" && !v.wrecked) lights.hazard = this.yieldEmergency > 0 && v.speed < 1 && this.p.lawfulness > 0.8;
+    if (this.state === "drive" && !v.wrecked) lights.hazard = this.holdKind === "breakdown" || (this.yieldEmergency > 0 && v.speed < 1 && this.p.lawfulness > 0.8);
     if (this.lcIntent === undefined) {
       const want = this.turnSignalWanted();
       const segId = v.seg !== undefined ? v.seg.id : -1;
@@ -805,6 +916,7 @@ export class AIDriver implements DriverView {
   private leaderHasReason(ctx: SimContext, lead: Vehicle): boolean {
     const d = ctx.driverOf(lead);
     if (d !== undefined) {
+      if (d.holdTime > 0) return true;
       if (d.stopDist < 8) return true;
       if (d.leader.gap < 8 && d.leader.speed < 0.5) return true;
       if (d.state !== "drive") return d.state === "crashed" ? false : true;

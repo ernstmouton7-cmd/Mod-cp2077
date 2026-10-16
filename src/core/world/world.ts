@@ -448,6 +448,7 @@ export class World implements SimContext {
       }
     }
     this.updatePedestrians(dt);
+    this.updateIncidents(dt);
     this.physics(dt);
     this.collisions();
     this.lawAndOrder(dt);
@@ -491,6 +492,11 @@ export class World implements SimContext {
         if (prev !== undefined && v.s < v.halfLen + 0.5) addOccupant(prev, v, prev.length + v.s, v.speed, false, v.lat);
         // Lane change shadow.
         const d = this.drivers.get(v.id);
+        // Overtaking in the oncoming lane: oncoming drivers must see us.
+        if (d !== undefined && d.passing !== undefined && Math.abs(v.lat) > 1.2 && seg.kind === "lane") {
+          const opp = d.passing;
+          addOccupant(opp, v, opp.length - v.s, -v.speed, true, 0);
+        }
         if (d !== undefined && d.shadowLane !== undefined && seg.kind === "lane") {
           const sh = d.shadowLane;
           const sS = (v.s * sh.length) / seg.length;
@@ -907,6 +913,63 @@ export class World implements SimContext {
           this.offend(p, v, "near_miss", clamp(rel / 12, 0.5, 2));
         }
       }
+    }
+  }
+
+  // ----------------------------------------------------------- incidents
+
+  /** Seconds between random breakdowns / power cuts (0 disables). */
+  breakdownInterval = 80;
+  outageInterval = 300;
+  private breakdownTimer = 45;
+  private outageTimer = 150;
+  private outages: { sig: SignalController; until: number }[] = [];
+
+  private updateIncidents(dt: number): void {
+    const p = this.player;
+    if (this.breakdownInterval > 0) {
+      this.breakdownTimer -= dt;
+      if (this.breakdownTimer <= 0) {
+        this.breakdownTimer = this.rng.range(this.breakdownInterval * 0.6, this.breakdownInterval * 1.4);
+        // Prefer a car the player will meet: 50-300 m away, mid-block.
+        const cands: Vehicle[] = [];
+        for (const v of this.vehicles) {
+          if (v.role !== "civilian" || v.mode !== "lane" || v.seg === undefined || v.seg.kind !== "lane" || v.speed < 3) continue;
+          if (v.s < 15 || v.seg.length - v.s < 35) continue;
+          const d = this.drivers.get(v.id);
+          if (d === undefined || d.holdTime > 0 || d.rage !== undefined) continue;
+          if (p !== undefined) {
+            const dist = hypot(v.x - p.x, v.y - p.y);
+            if (dist < 50 || dist > 300) continue;
+          }
+          cands.push(v);
+        }
+        if (cands.length > 0) {
+          const v = this.rng.pick(cands);
+          const d = this.drivers.get(v.id) as AIDriver;
+          d.hold("breakdown", this.rng.range(40, 90));
+          this.events.emit({ type: "incident", kind: "breakdown", x: v.x, y: v.y, vehicle: v.id, node: -1, where: (v.seg as Lane).road.name });
+        }
+      }
+    }
+    if (this.outageInterval > 0 && this.signals.length > 0) {
+      this.outageTimer -= dt;
+      if (this.outageTimer <= 0) {
+        this.outageTimer = this.rng.range(this.outageInterval * 0.6, this.outageInterval * 1.4);
+        const sig = this.rng.pick(this.signals);
+        if (sig.mode !== "off" && sig.mode !== "flashing") {
+          sig.setMode("off");
+          this.outages.push({ sig, until: this.time + this.rng.range(80, 140) });
+          this.events.emit({ type: "incident", kind: "power_cut", x: sig.node.x, y: sig.node.y, vehicle: -1, node: sig.node.id, where: sig.node.name });
+        }
+      }
+    }
+    for (let i = this.outages.length - 1; i >= 0; i--) {
+      const o = this.outages[i];
+      if (this.time < o.until) continue;
+      o.sig.setMode("actuated");
+      this.outages.splice(i, 1);
+      this.events.emit({ type: "incident", kind: "power_restored", x: o.sig.node.x, y: o.sig.node.y, vehicle: -1, node: o.sig.node.id, where: o.sig.node.name });
     }
   }
 

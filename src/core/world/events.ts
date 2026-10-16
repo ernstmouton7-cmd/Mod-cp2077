@@ -31,4 +31,5 @@ export type SimEvent =
   | { type: "despawn"; vehicle: number }
   | { type: "ped_speech"; ped: number; text: string; x: number; y: number }
   | { type: "ped_hit"; ped: number; vehicle: number; severity: number; x: number; y: number }
+  | { type: "incident"; kind: "breakdown" | "power_cut" | "power_restored"; x: number; y: number; vehicle: number; node: number; where: string }
   | { type: "info"; text: string };
