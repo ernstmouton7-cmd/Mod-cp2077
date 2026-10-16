@@ -1,0 +1,28 @@
+{
+  "name": "gridlock",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gridlock: an engine-agnostic traffic, signal, vehicle-dynamics and road-rage simulation for open-world games (with a Cyberpunk 2077 CET mod and a playable 3D browser sandbox).",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src tests",
+    "test": "node scripts/test.mjs",
+    "test:lua": "node scripts/build-lua.mjs && node scripts/test-lua.mjs",
+    "build:lua": "node scripts/build-lua.mjs",
+    "build:web": "node scripts/build-web.mjs",
+    "build": "npm run build:lua && npm run build:web",
+    "check": "npm run typecheck && npm run lint && npm test && npm run test:lua"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "@types/three": "^0.160.0",
+    "esbuild": "^0.23.1",
+    "eslint": "^9.9.1",
+    "three": "^0.160.0",
+    "typescript": "^5.5.2",
+    "typescript-eslint": "^8.4.0",
+    "typescript-to-lua": "^1.26.2"
+  }
+}
