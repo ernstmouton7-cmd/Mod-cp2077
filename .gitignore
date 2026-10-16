@@ -5,3 +5,6 @@ dist/*
 !dist/.gitkeep
 *.log
 .DS_Store
+engine/target/
+engine/assets/cache/
+engine/target-*/
