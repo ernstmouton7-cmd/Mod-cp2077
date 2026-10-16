@@ -6953,6 +6953,351 @@ function Environment.prototype.update(self, dt)
 end
 return ____exports
  end,
+["src.core.road.crosswalks"] = function(...) 
+local ____lualib = require("lualib_bundle")
+local Map = ____lualib.Map
+local __TS__New = ____lualib.__TS__New
+local __TS__ArraySort = ____lualib.__TS__ArraySort
+local ____exports = {}
+local firstCrossing
+local ____path = require("src.core.math.path")
+local segmentIntersect = ____path.segmentIntersect
+function firstCrossing(c, cw)
+    local p = c.path
+    do
+        local i = 0
+        while i < #p.xs - 1 do
+            local hit = segmentIntersect(
+                p.xs[i + 1],
+                p.ys[i + 1],
+                p.xs[i + 1 + 1],
+                p.ys[i + 1 + 1],
+                cw.ax,
+                cw.ay,
+                cw.bx,
+                cw.by
+            )
+            if hit ~= nil then
+                return {cw = cw, s = p.cum[i + 1] + hit.t * (p.cum[i + 1 + 1] - p.cum[i + 1]), t = hit.u}
+            end
+            i = i + 1
+        end
+    end
+    return nil
+end
+--- Builds crosswalks at every controlled junction (signals and signs) and the
+-- points where each connector's path crosses them. Crosswalk geometry matches
+-- the zebra band drawn by renderers: 2.6 m inside the junction box radius.
+function ____exports.buildCrosswalks(net)
+    local crosswalks = {}
+    local crossings = __TS__New(Map)
+    for ____, n in ipairs(net.nodes) do
+        do
+            local __continue3
+            repeat
+                if #n.roads < 3 or n.control == "none" then
+                    __continue3 = true
+                    break
+                end
+                for ____, r in ipairs(n.roads) do
+                    local h = r:headingFrom(n)
+                    local dx = math.cos(h)
+                    local dy = math.sin(h)
+                    local px = -dy
+                    local py = dx
+                    local mid = n.radius - 2.6
+                    local half = r.width / 2 + 0.6
+                    local cx = n.x + dx * mid
+                    local cy = n.y + dy * mid
+                    crosswalks[#crosswalks + 1] = {
+                        id = #crosswalks,
+                        node = n,
+                        road = r,
+                        ax = cx - px * half,
+                        ay = cy - py * half,
+                        bx = cx + px * half,
+                        by = cy + py * half,
+                        length = half * 2,
+                        roadHeading = h
+                    }
+                end
+                __continue3 = true
+            until true
+            if not __continue3 then
+                break
+            end
+        end
+    end
+    for ____, c in ipairs(net.connectors) do
+        local list = {}
+        for ____, cw in ipairs(crosswalks) do
+            do
+                local __continue9
+                repeat
+                    if cw.node ~= c.node then
+                        __continue9 = true
+                        break
+                    end
+                    local hit = firstCrossing(c, cw)
+                    if hit ~= nil then
+                        list[#list + 1] = hit
+                    end
+                    __continue9 = true
+                until true
+                if not __continue9 then
+                    break
+                end
+            end
+        end
+        __TS__ArraySort(
+            list,
+            function(____, a, b) return a.s ~= b.s and a.s - b.s or a.cw.id - b.cw.id end
+        )
+        if #list > 0 then
+            crossings:set(c.id, list)
+        end
+    end
+    return {crosswalks = crosswalks, crossings = crossings}
+end
+return ____exports
+ end,
+["src.core.ai.pedestrians"] = function(...) 
+local ____lualib = require("lualib_bundle")
+local __TS__Class = ____lualib.__TS__Class
+local __TS__New = ____lualib.__TS__New
+local __TS__ArraySplice = ____lualib.__TS__ArraySplice
+local ____exports = {}
+local ____scalar = require("src.core.math.scalar")
+local angleDiff = ____scalar.angleDiff
+local clamp = ____scalar.clamp
+local DEG = ____scalar.DEG
+--- A pedestrian using a crosswalk. Positions are in sim coordinates.
+____exports.Pedestrian = __TS__Class()
+local Pedestrian = ____exports.Pedestrian
+Pedestrian.name = "Pedestrian"
+function Pedestrian.prototype.____constructor(self, id, cw, rng)
+    self.id = id
+    self.cw = cw
+    self.x = 0
+    self.y = 0
+    self.heading = 0
+    self.t = 0
+    self.dir = 1
+    self.state = "waiting"
+    self.waited = 0
+    self.ttl = 0
+    self.stride = 0
+    self.shoutCooldown = 0
+    self.speed = clamp(
+        rng:gauss(1.35, 0.25),
+        0.8,
+        2
+    )
+    self.reckless = rng:chance(0.08)
+    self.shirt = rng:pick({
+        14737632,
+        2829099,
+        11549230,
+        3049153,
+        15844367,
+        8207512,
+        1482885,
+        13849600,
+        3426654
+    })
+    self.height = clamp(
+        rng:gauss(1.72, 0.08),
+        1.5,
+        1.95
+    )
+    self.dir = rng:chance(0.5) and 1 or -1
+    self.t = self.dir > 0 and 0 or 1
+    self:place()
+end
+function Pedestrian.prototype.place(self)
+    local cw = self.cw
+    local t = self.t
+    if self.state == "waiting" then
+        t = self.dir > 0 and -0.9 / cw.length or 1 + 0.9 / cw.length
+    end
+    self.x = cw.ax + (cw.bx - cw.ax) * t
+    self.y = cw.ay + (cw.by - cw.ay) * t
+    self.heading = math.atan2((cw.by - cw.ay) * self.dir, (cw.bx - cw.ax) * self.dir)
+end
+--- Spawns pedestrians at crosswalk ends, lets them cross with the walk signal
+-- (or a safe gap at stop-sign junctions), makes them look before stepping off
+-- and pause for cars in their path, and removes them once they are done.
+____exports.PedestrianSystem = __TS__Class()
+local PedestrianSystem = ____exports.PedestrianSystem
+PedestrianSystem.name = "PedestrianSystem"
+function PedestrianSystem.prototype.____constructor(self, crosswalks, rng)
+    self.crosswalks = crosswalks
+    self.rng = rng
+    self.peds = {}
+    self.nextId = 1
+    self.spawnTimer = 0
+    self.target = 40
+end
+function PedestrianSystem.prototype.walkAllowed(self, host, cw, reckless)
+    local n = cw.node
+    if n.control ~= "signal" or n.signalId < 0 then
+        return false
+    end
+    local sig = host.signals[n.signalId + 1]
+    if sig.mode == "flashing" or sig.mode == "off" then
+        return false
+    end
+    for ____, ap in ipairs(n.approaches) do
+        do
+            local __continue9
+            repeat
+                if ap.road == cw.road then
+                    __continue9 = true
+                    break
+                end
+                local rel = math.abs(math.abs(angleDiff(ap.heading, cw.roadHeading)) - 90 * DEG)
+                if rel > 30 * DEG then
+                    __continue9 = true
+                    break
+                end
+                local h = sig:head(ap)
+                if h.ped == "walk" or reckless and h.ped == "flash" then
+                    return true
+                end
+                __continue9 = true
+            until true
+            if not __continue9 then
+                break
+            end
+        end
+    end
+    return false
+end
+function PedestrianSystem.prototype.update(self, dt, host)
+    self.spawnTimer = self.spawnTimer - dt
+    if self.spawnTimer <= 0 and #self.crosswalks > 0 then
+        self.spawnTimer = 0.6
+        if #self.peds < self.target then
+            local cw = self.rng:pick(self.crosswalks)
+            local crowded = 0
+            for ____, p in ipairs(self.peds) do
+                if p.cw == cw and p.state == "waiting" then
+                    crowded = crowded + 1
+                end
+            end
+            if crowded < 4 then
+                local ____self_peds_4 = self.peds
+                local ____exports_Pedestrian_3 = ____exports.Pedestrian
+                local ____self_0, ____nextId_1 = self, "nextId"
+                local ____self_nextId_2 = ____self_0[____nextId_1]
+                ____self_0[____nextId_1] = ____self_nextId_2 + 1
+                ____self_peds_4[#____self_peds_4 + 1] = __TS__New(____exports_Pedestrian_3, ____self_nextId_2, cw, self.rng)
+            end
+        end
+    end
+    do
+        local i = #self.peds - 1
+        while i >= 0 do
+            do
+                local __continue21
+                repeat
+                    local p = self.peds[i + 1]
+                    p.shoutCooldown = p.shoutCooldown - dt
+                    local cw = p.cw
+                    if p.state == "waiting" then
+                        p.waited = p.waited + dt
+                        local go = false
+                        if cw.node.control == "signal" then
+                            go = self:walkAllowed(host, cw, p.reckless)
+                        else
+                            local midx = (cw.ax + cw.bx) / 2
+                            local midy = (cw.ay + cw.by) / 2
+                            go = p.waited > 1.5 and not host.trafficApproaching(midx, midy, cw.length / 2 + 2, p.reckless and 1.5 or 3.5)
+                        end
+                        if p.waited > 120 then
+                            go = true
+                        end
+                        if go then
+                            local sx = cw.ax + (cw.bx - cw.ax) * p.t
+                            local sy = cw.ay + (cw.by - cw.ay) * p.t
+                            if host.vehicleAt(sx, sy, 2.2) or host.trafficApproaching(sx, sy, 2.5, p.reckless and 0.6 or 1.4) then
+                                go = false
+                            end
+                        end
+                        if go then
+                            p.state = "crossing"
+                            p:place()
+                        end
+                    elseif p.state == "crossing" then
+                        local ux = (cw.bx - cw.ax) / cw.length
+                        local uy = (cw.by - cw.ay) / cw.length
+                        if host.vehicleAt(p.x + ux * p.dir * 1, p.y + uy * p.dir * 1, 0.4) then
+                            if p.shoutCooldown <= 0 and host.vehicleAt(p.x, p.y, 1) then
+                                p.shoutCooldown = 6
+                                host.onShout(p)
+                            end
+                            __continue21 = true
+                            break
+                        end
+                        p.t = p.t + p.dir * p.speed * dt / cw.length
+                        p.stride = p.stride + p.speed * dt * 1.8
+                        if p.t >= 1 or p.t <= 0 then
+                            p.t = clamp(p.t, 0, 1)
+                            p.state = "leaving"
+                            p.ttl = 4
+                        end
+                        p:place()
+                    elseif p.state == "leaving" then
+                        local away = cw.roadHeading
+                        p.x = p.x + math.cos(away) * p.speed * dt
+                        p.y = p.y + math.sin(away) * p.speed * dt
+                        p.heading = away
+                        p.stride = p.stride + p.speed * dt * 1.8
+                        p.ttl = p.ttl - dt
+                        if p.ttl <= 0 then
+                            __TS__ArraySplice(self.peds, i, 1)
+                        end
+                    else
+                        p.ttl = p.ttl - dt
+                        if p.ttl <= 0 then
+                            __TS__ArraySplice(self.peds, i, 1)
+                        end
+                    end
+                    __continue21 = true
+                until true
+                if not __continue21 then
+                    break
+                end
+            end
+            i = i - 1
+        end
+    end
+end
+function PedestrianSystem.prototype.blocking(self, cw, t, halfWidth)
+    for ____, p in ipairs(self.peds) do
+        do
+            local __continue38
+            repeat
+                if p.cw ~= cw or p.state ~= "crossing" then
+                    __continue38 = true
+                    break
+                end
+                local along = (p.t - t) * cw.length
+                local approaching = along * p.dir < 0 and math.abs(along) < halfWidth + p.speed * 2.5
+                if math.abs(along) < halfWidth or approaching then
+                    return true
+                end
+                __continue38 = true
+            until true
+            if not __continue38 then
+                break
+            end
+        end
+    end
+    return false
+end
+return ____exports
+ end,
 ["src.core.world.events"] = function(...) 
 --[[ Generated with https://github.com/TypeScriptToLua/TypeScriptToLua ]]
 local ____exports = {}
@@ -7059,11 +7404,39 @@ return ____exports
 local ____lualib = require("lualib_bundle")
 local __TS__Class = ____lualib.__TS__Class
 local ____exports = {}
+local pedInFront
 local ____scalar = require("src.core.math.scalar")
 local angleDiff = ____scalar.angleDiff
 local clamp = ____scalar.clamp
 local DEG = ____scalar.DEG
 local lerp = ____scalar.lerp
+function pedInFront(ctx, me)
+    local c = math.cos(me.heading)
+    local s = math.sin(me.heading)
+    for ____, p in ipairs(ctx.peds.peds) do
+        do
+            local __continue127
+            repeat
+                if p.state ~= "crossing" then
+                    __continue127 = true
+                    break
+                end
+                local dx = p.x - me.x
+                local dy = p.y - me.y
+                local lx = dx * c + dy * s
+                local ly = -dx * s + dy * c
+                if lx > me.halfLen - 0.5 and lx < me.halfLen + 2.5 and math.abs(ly) < me.halfWid + 0.6 then
+                    return true
+                end
+                __continue127 = true
+            until true
+            if not __continue127 then
+                break
+            end
+        end
+    end
+    return false
+end
 --- Per-approach latched decisions (reset whenever the driver enters a new lane).
 ____exports.JunctionState = __TS__Class()
 local JunctionState = ____exports.JunctionState
@@ -7756,6 +8129,45 @@ function ____exports.connectorStopDistance(ctx, d, c, dt)
     end
     return stopAt
 end
+--- Distance (from our front bumper) at which to stop for pedestrians on a
+-- crosswalk that connector `c` crosses, or Infinity. `ahead` is the distance
+-- from our front bumper to the start of `c` (negative once on it).
+function ____exports.pedestrianStopDistance(ctx, me, c, ahead, frontOnC)
+    local list = ctx.crossings:get(c.id)
+    if list == nil then
+        return math.huge
+    end
+    for ____, x in ipairs(list) do
+        do
+            local __continue119
+            repeat
+                if x.s < frontOnC - 0.3 then
+                    __continue119 = true
+                    break
+                end
+                local dist = ahead + x.s - math.max(frontOnC, 0) - 1.6
+                if dist > 45 then
+                    break
+                end
+                if not ctx.peds:blocking(x.cw, x.t, 1.7) then
+                    __continue119 = true
+                    break
+                end
+                if dist > 0 then
+                    return dist
+                end
+                if pedInFront(ctx, me) then
+                    return 0
+                end
+                __continue119 = true
+            until true
+            if not __continue119 then
+                break
+            end
+        end
+    end
+    return math.huge
+end
 function ____exports.nodeOf(c)
     return c.node
 end
@@ -7835,6 +8247,7 @@ local ____intersection = require("src.core.ai.intersection")
 local approachStopDistance = ____intersection.approachStopDistance
 local connectorStopDistance = ____intersection.connectorStopDistance
 local JunctionState = ____intersection.JunctionState
+local pedestrianStopDistance = ____intersection.pedestrianStopDistance
 local ____speech = require("src.core.ai.speech")
 local lineFor = ____speech.lineFor
 --- Anger vehicles in front of a honking car.
@@ -7843,28 +8256,28 @@ function ____exports.hornVictims(ctx, honker, long)
     local hs = math.sin(honker.heading)
     for ____, o in ipairs(ctx.vehicles) do
         do
-            local __continue291
+            local __continue294
             repeat
                 if o == honker or not o.alive then
-                    __continue291 = true
+                    __continue294 = true
                     break
                 end
                 local dx = o.x - honker.x
                 local dy = o.y - honker.y
                 local fwd = dx * hc + dy * hs
                 if fwd < 0 or fwd > 30 then
-                    __continue291 = true
+                    __continue294 = true
                     break
                 end
                 local side = math.abs(-dx * hs + dy * hc)
                 if side > 4 + fwd * 0.2 then
-                    __continue291 = true
+                    __continue294 = true
                     break
                 end
                 ctx:offend(honker, o, long and "long_honk" or "honked_at", 1)
-                __continue291 = true
+                __continue294 = true
             until true
-            if not __continue291 then
+            if not __continue294 then
                 break
             end
         end
@@ -8355,6 +8768,32 @@ function AIDriver.prototype.laneUpdate(self, dt, ctx)
     elseif seg.kind == "connector" then
         self.stopDist = connectorStopDistance(ctx, self, seg, dt)
     end
+    if seg.kind == "lane" and self.next ~= nil then
+        local toLine = seg.length - v.s - v.halfLen
+        if toLine < 50 then
+            self.stopDist = math.min(
+                self.stopDist,
+                pedestrianStopDistance(
+                    ctx,
+                    v,
+                    self.next,
+                    toLine,
+                    0
+                )
+            )
+        end
+    elseif seg.kind == "connector" then
+        self.stopDist = math.min(
+            self.stopDist,
+            pedestrianStopDistance(
+                ctx,
+                v,
+                seg,
+                0,
+                v.s + v.halfLen
+            )
+        )
+    end
     if seg.kind == "lane" and self.next == nil then
         self.stopDist = math.min(self.stopDist, seg.length - v.s - v.halfLen)
     end
@@ -8555,19 +8994,19 @@ function AIDriver.prototype.laneChanges(self, dt, ctx)
     local cands = {lane.left, lane.right}
     for ____, cand in ipairs(cands) do
         do
-            local __continue124
+            local __continue127
             repeat
                 if cand == nil then
-                    __continue124 = true
+                    __continue127 = true
                     break
                 end
                 if #good > 0 and __TS__ArrayIndexOf(good, cand) < 0 and toEnd < 150 then
-                    __continue124 = true
+                    __continue127 = true
                     break
                 end
                 local g = self:evaluateLane(ctx, lane, cand)
                 if g == nil then
-                    __continue124 = true
+                    __continue127 = true
                     break
                 end
                 local bias = cand == lane.right and 0.12 or -0.05
@@ -8578,9 +9017,9 @@ function AIDriver.prototype.laneChanges(self, dt, ctx)
                     bestGain = gain
                     best = cand
                 end
-                __continue124 = true
+                __continue127 = true
             until true
-            if not __continue124 then
+            if not __continue127 then
                 break
             end
         end
@@ -8606,11 +9045,11 @@ function AIDriver.prototype.evaluateLane(self, ctx, lane, cand)
         local i = 0
         while i < cand.occCount do
             do
-                local __continue134
+                local __continue137
                 repeat
                     local e = cand.occ[i + 1]
                     if e.occ.id == v.id then
-                        __continue134 = true
+                        __continue137 = true
                         break
                     end
                     if e.s >= sT then
@@ -8620,9 +9059,9 @@ function AIDriver.prototype.evaluateLane(self, ctx, lane, cand)
                     elseif fol == nil or e.s > fol.s then
                         fol = {s = e.s, v = e.v, len = e.occ.length, id = e.occ.id}
                     end
-                    __continue134 = true
+                    __continue137 = true
                 until true
-                if not __continue134 then
+                if not __continue137 then
                     break
                 end
             end
@@ -8635,20 +9074,20 @@ function AIDriver.prototype.evaluateLane(self, ctx, lane, cand)
                 local i = 0
                 while i < c.occCount do
                     do
-                        local __continue141
+                        local __continue144
                         repeat
                             local e = c.occ[i + 1]
                             if e.occ.id == v.id then
-                                __continue141 = true
+                                __continue144 = true
                                 break
                             end
                             local s = e.s - c.length
                             if fol == nil or s > fol.s then
                                 fol = {s = s, v = e.v, len = e.occ.length, id = e.occ.id}
                             end
-                            __continue141 = true
+                            __continue144 = true
                         until true
-                        if not __continue141 then
+                        if not __continue144 then
                             break
                         end
                     end
@@ -8996,17 +9435,17 @@ function AIDriver.prototype.checkEmergencyBehind(self, dt, ctx)
     local hs = math.sin(v.heading)
     for ____, e in ipairs(ctx.vehicles) do
         do
-            local __continue218
+            local __continue221
             repeat
                 if not e:sirenOn() or e == v or not e.alive then
-                    __continue218 = true
+                    __continue221 = true
                     break
                 end
                 local dx = e.x - v.x
                 local dy = e.y - v.y
                 local d2 = dx * dx + dy * dy
                 if d2 > 80 * 80 then
-                    __continue218 = true
+                    __continue221 = true
                     break
                 end
                 local behind = dx * hc + dy * hs < -2
@@ -9015,9 +9454,9 @@ function AIDriver.prototype.checkEmergencyBehind(self, dt, ctx)
                     self.yieldEmergency = 2.5
                     return
                 end
-                __continue218 = true
+                __continue221 = true
             until true
-            if not __continue218 then
+            if not __continue221 then
                 break
             end
         end
@@ -9202,9 +9641,9 @@ function AIDriver.prototype.physicsUpdate(self, dt, ctx)
         return
     end
     repeat
-        local ____switch264 = self.state
-        local ____cond264 = ____switch264 == "crashed"
-        if ____cond264 then
+        local ____switch267 = self.state
+        local ____cond267 = ____switch267 == "crashed"
+        if ____cond267 then
             do
                 brakeToStop(v, true)
                 if v.physicsTime > 1 then
@@ -9230,8 +9669,8 @@ function AIDriver.prototype.physicsUpdate(self, dt, ctx)
                 return
             end
         end
-        ____cond264 = ____cond264 or ____switch264 == "chasing"
-        if ____cond264 then
+        ____cond267 = ____cond267 or ____switch267 == "chasing"
+        if ____cond267 then
             do
                 local rage = self.rage
                 if rage == nil then
@@ -9267,8 +9706,8 @@ function AIDriver.prototype.physicsUpdate(self, dt, ctx)
                 return
             end
         end
-        ____cond264 = ____cond264 or ____switch264 == "recovering"
-        if ____cond264 then
+        ____cond267 = ____cond267 or ____switch267 == "recovering"
+        if ____cond267 then
             self:recoverUpdate(dt, ctx)
             return
         end
@@ -9288,10 +9727,10 @@ function AIDriver.prototype.recoverUpdate(self, dt, ctx)
         local bestScore = math.huge
         for ____, h in ipairs(hits) do
             do
-                local __continue279
+                local __continue282
                 repeat
                     if h.s > h.lane.length - 15 then
-                        __continue279 = true
+                        __continue282 = true
                         break
                     end
                     local ang = math.abs(angleDiff(
@@ -9303,9 +9742,9 @@ function AIDriver.prototype.recoverUpdate(self, dt, ctx)
                         bestScore = score
                         best = h
                     end
-                    __continue279 = true
+                    __continue282 = true
                 until true
-                if not __continue279 then
+                if not __continue282 then
                     break
                 end
             end
@@ -9539,6 +9978,20 @@ ____exports.VIOLATIONS = {
         points = 8,
         heat = 3,
         cooldown = 60
+    },
+    fail_yield_pedestrian = {
+        label = "Failure to yield to a pedestrian",
+        fine = 350,
+        points = 3,
+        heat = 1,
+        cooldown = 8
+    },
+    hit_pedestrian = {
+        label = "Hit a pedestrian",
+        fine = 5000,
+        points = 8,
+        heat = 3,
+        cooldown = 5
     }
 }
 local SPEED_TIERS = {"speeding_minor", "speeding_major", "speeding_extreme"}
@@ -11796,7 +12249,7 @@ local AVENUE_NAMES = {"Meridian Ave", "Vanta Ave", "Arcadia Ave", "Helix Ave"}
 local function lineSpecs(count, rng, axis)
     local specs = {}
     local oneWayToggle = rng:chance(0.5)
-    local avenueIdx = 0
+    local avenueIdx = axis == "col" and 0 or 2
     local streetIdx = axis == "col" and 0 or 7
     do
         local i = 0
@@ -12348,7 +12801,7 @@ local __TS__ArraySplice = ____lualib.__TS__ArraySplice
 local __TS__ArrayEvery = ____lualib.__TS__ArrayEvery
 local __TS__ArraySort = ____lualib.__TS__ArraySort
 local ____exports = {}
-local lanePairCanCollide, setBox
+local lanePairCanCollide, setBox, PED_SHOUTS
 local ____driver = require("src.core.ai.driver")
 local hornVictims = ____driver.hornVictims
 local ____speech = require("src.core.ai.speech")
@@ -12397,6 +12850,10 @@ local ____environment = require("src.core.world.environment")
 local Environment = ____environment.Environment
 local ____spawner = require("src.core.world.spawner")
 local Spawner = ____spawner.Spawner
+local ____pedestrians = require("src.core.ai.pedestrians")
+local PedestrianSystem = ____pedestrians.PedestrianSystem
+local ____crosswalks = require("src.core.road.crosswalks")
+local buildCrosswalks = ____crosswalks.buildCrosswalks
 function lanePairCanCollide(a, b)
     local sa = a.seg
     local sb = b.seg
@@ -12474,6 +12931,7 @@ function World.prototype.____constructor(self, opts)
     self.timeScale = 1
     self.hostActions = {}
     self.obstacles = {}
+    self.pedestrianDensity = 45
     self.drivers = __TS__New(Map)
     self.byId = __TS__New(Map)
     self.allWayQueues = __TS__New(Map)
@@ -12530,6 +12988,73 @@ function World.prototype.____constructor(self, opts)
         return n
     end
     self.observations = {}
+    self.pedHost = {
+        signals = self.signals,
+        trafficApproaching = function(x, y, radius, seconds)
+            for ____, v in ipairs(self.vehicles) do
+                do
+                    local __continue20
+                    repeat
+                        local dx = x - v.x
+                        local dy = y - v.y
+                        local d = math.sqrt(dx * dx + dy * dy)
+                        if d > radius + v:absSpeed() * seconds + 3 then
+                            __continue20 = true
+                            break
+                        end
+                        if d < radius + 2 then
+                            return true
+                        end
+                        local toward = (dx * math.cos(v.heading) + dy * math.sin(v.heading)) / math.max(d, 0.1)
+                        if toward > 0.6 and v:absSpeed() > 1 then
+                            return true
+                        end
+                        __continue20 = true
+                    until true
+                    if not __continue20 then
+                        break
+                    end
+                end
+            end
+            return false
+        end,
+        vehicleAt = function(x, y, margin)
+            for ____, v in ipairs(self.vehicles) do
+                do
+                    local __continue26
+                    repeat
+                        local dx = x - v.x
+                        local dy = y - v.y
+                        if math.abs(dx) > v.halfLen + margin + 1 or math.abs(dy) > v.halfLen + margin + 1 then
+                            __continue26 = true
+                            break
+                        end
+                        local c = math.cos(v.heading)
+                        local s = math.sin(v.heading)
+                        local lx = dx * c + dy * s
+                        local ly = -dx * s + dy * c
+                        if math.abs(lx) < v.halfLen + margin and math.abs(ly) < v.halfWid + margin then
+                            return true
+                        end
+                        __continue26 = true
+                    until true
+                    if not __continue26 then
+                        break
+                    end
+                end
+            end
+            return false
+        end,
+        onShout = function(p)
+            self.events:emit({
+                type = "ped_speech",
+                ped = p.id,
+                text = self.rng:pick(PED_SHOUTS),
+                x = p.x,
+                y = p.y
+            })
+        end
+    }
     local seed = opts.seed or 2077
     self.rng = __TS__New(Rng, seed)
     self.fixedDt = opts.fixedDt or 1 / 60
@@ -12539,6 +13064,14 @@ function World.prototype.____constructor(self, opts)
     self.env = __TS__New(Environment, seed + 1, opts.startHour or 19.5)
     self:buildSignals()
     self:buildObstacles()
+    local cw = buildCrosswalks(self.net)
+    self.crosswalks = cw.crosswalks
+    self.crossings = cw.crossings
+    self.peds = __TS__New(
+        PedestrianSystem,
+        self.crosswalks,
+        self.rng:fork()
+    )
     local host = {
         rng = self.rng,
         vehicles = self.vehicles,
@@ -12582,10 +13115,10 @@ function World.prototype.buildSignals(self)
     local coord = 0
     for ____, n in ipairs(self.net.nodes) do
         do
-            local __continue20
+            local __continue32
             repeat
                 if n.control ~= "signal" then
-                    __continue20 = true
+                    __continue32 = true
                     break
                 end
                 local offset = math.max(0, (n.x - self.net.minX) / 13.9)
@@ -12605,9 +13138,9 @@ function World.prototype.buildSignals(self)
                 local ____self_signals_3 = self.signals
                 ____self_signals_3[#____self_signals_3 + 1] = sig
                 coord = coord + 1
-                __continue20 = true
+                __continue32 = true
             until true
-            if not __continue20 then
+            if not __continue32 then
                 break
             end
         end
@@ -12617,10 +13150,10 @@ end
 function World.prototype.buildObstacles(self)
     for ____, b in ipairs(self.city.buildings) do
         do
-            local __continue25
+            local __continue37
             repeat
                 if b.kind == "park" or b.kind == "plaza" then
-                    __continue25 = true
+                    __continue37 = true
                     break
                 end
                 local box = {
@@ -12632,9 +13165,9 @@ function World.prototype.buildObstacles(self)
                 }
                 local ____self_obstacles_4 = self.obstacles
                 ____self_obstacles_4[#____self_obstacles_4 + 1] = box
-                __continue25 = true
+                __continue37 = true
             until true
-            if not __continue25 then
+            if not __continue37 then
                 break
             end
         end
@@ -12693,10 +13226,10 @@ function World.prototype.spawnPlayer(self, cls)
     local bd = math.huge
     for ____, l in ipairs(self.net.lanes) do
         do
-            local __continue31
+            local __continue43
             repeat
                 if l.length < 60 or l.right ~= nil then
-                    __continue31 = true
+                    __continue43 = true
                     break
                 end
                 local pt = {x = 0, y = 0, heading = 0}
@@ -12706,9 +13239,9 @@ function World.prototype.spawnPlayer(self, cls)
                     bd = d
                     best = l
                 end
-                __continue31 = true
+                __continue43 = true
             until true
-            if not __continue31 then
+            if not __continue43 then
                 break
             end
         end
@@ -12830,24 +13363,24 @@ function World.prototype.policeNear(self, x, y, range)
     local out = {}
     for ____, v in ipairs(self.vehicles) do
         do
-            local __continue53
+            local __continue65
             repeat
                 if v.role ~= "police" or not v.alive or v.wrecked then
-                    __continue53 = true
+                    __continue65 = true
                     break
                 end
                 local dx = v.x - x
                 local dy = v.y - y
                 if dx * dx + dy * dy > range * range then
-                    __continue53 = true
+                    __continue65 = true
                     break
                 end
                 if self:los(v.x, v.y, x, y) then
                     out[#out + 1] = v
                 end
-                __continue53 = true
+                __continue65 = true
             until true
-            if not __continue53 then
+            if not __continue65 then
                 break
             end
         end
@@ -12961,12 +13494,12 @@ function World.prototype.step(self, dt)
         local i = 0
         while i < #self.vehicles do
             do
-                local __continue82
+                local __continue94
                 repeat
                     local v = self.vehicles[i + 1]
                     local d = self.drivers:get(v.id)
                     if d == nil then
-                        __continue82 = true
+                        __continue94 = true
                         break
                     end
                     d:update(dt, self)
@@ -12974,15 +13507,16 @@ function World.prototype.step(self, dt)
                         self.events:emit({type = "mood", vehicle = v.id, mood = d.emo.mood, target = d.emo.target})
                         d.lastMood = d.emo.mood
                     end
-                    __continue82 = true
+                    __continue94 = true
                 until true
-                if not __continue82 then
+                if not __continue94 then
                     break
                 end
             end
             i = i + 1
         end
     end
+    self:updatePedestrians(dt)
     self:physics(dt)
     self:collisions()
     self:lawAndOrder(dt)
@@ -13025,11 +13559,11 @@ function World.prototype.rebuildOccupancy(self)
         local i = 0
         while i < #self.vehicles do
             do
-                local __continue98
+                local __continue110
                 repeat
                     local v = self.vehicles[i + 1]
                     if not v.alive then
-                        __continue98 = true
+                        __continue110 = true
                         break
                     end
                     if v.mode == "lane" and v.seg ~= nil then
@@ -13070,9 +13604,9 @@ function World.prototype.rebuildOccupancy(self)
                     else
                         self:registerFreeBody(v)
                     end
-                    __continue98 = true
+                    __continue110 = true
                 until true
-                if not __continue98 then
+                if not __continue110 then
                     break
                 end
             end
@@ -13087,17 +13621,17 @@ function World.prototype.registerFreeBody(self, v)
     local sh = math.sin(v.heading)
     for ____, h in ipairs(self.laneHits) do
         do
-            local __continue105
+            local __continue117
             repeat
                 local lh = h.lane.path:headingAt(h.s)
                 local rel = math.abs(math.sin(v.heading - lh))
                 local halfAcross = v.halfWid * (1 - rel) + v.halfLen * rel
                 if math.abs(h.lateral) > h.lane.width / 2 + halfAcross - 0.3 then
-                    __continue105 = true
+                    __continue117 = true
                     break
                 end
                 if h.s < -v.halfLen or h.s > h.lane.length + v.halfLen then
-                    __continue105 = true
+                    __continue117 = true
                     break
                 end
                 local vAlong = v:vx() * math.cos(lh) + v:vy() * math.sin(lh)
@@ -13109,9 +13643,9 @@ function World.prototype.registerFreeBody(self, v)
                     true,
                     h.lateral
                 )
-                __continue105 = true
+                __continue117 = true
             until true
-            if not __continue105 then
+            if not __continue117 then
                 break
             end
         end
@@ -13121,15 +13655,15 @@ function World.prototype.registerFreeBody(self, v)
     local pr = {s = 0, lateral = 0, d2 = 0}
     for ____, c in ipairs(self.connHits) do
         do
-            local __continue109
+            local __continue121
             repeat
                 c.path:project(v.x, v.y, pr)
                 if pr.d2 > 2.6 * 2.6 then
-                    __continue109 = true
+                    __continue121 = true
                     break
                 end
                 if pr.s <= 0.01 and pr.d2 > 1 then
-                    __continue109 = true
+                    __continue121 = true
                     break
                 end
                 local lh = c.path:headingAt(pr.s)
@@ -13142,9 +13676,9 @@ function World.prototype.registerFreeBody(self, v)
                     true,
                     pr.lateral
                 )
-                __continue109 = true
+                __continue121 = true
             until true
-            if not __continue109 then
+            if not __continue121 then
                 break
             end
         end
@@ -13217,17 +13751,17 @@ function World.prototype.gesture(self, p, kind)
     self.events:emit({type = "gesture", from = p.id, kind = kind})
     for ____, v in ipairs(self.vehicles) do
         do
-            local __continue132
+            local __continue144
             repeat
                 local d = self.drivers:get(v.id)
                 if d == nil then
-                    __continue132 = true
+                    __continue144 = true
                     break
                 end
                 local dist = hypot(v.x - p.x, v.y - p.y)
                 if kind == "wave" and dist < 45 then
                     if d.emo:grudgeAgainst(p.id) <= 0 then
-                        __continue132 = true
+                        __continue144 = true
                         break
                     end
                     local calmed = d.emo:apologize(p.id, self.time)
@@ -13241,14 +13775,14 @@ function World.prototype.gesture(self, p, kind)
                     if d.p.archetype == "zen" then
                         d.speechCooldown = 0
                         d:say(self, "Have a nice day!")
-                        __continue132 = true
+                        __continue144 = true
                         break
                     end
                     self:offend(p, v, "rude_gesture", 1)
                 end
-                __continue132 = true
+                __continue144 = true
             until true
-            if not __continue132 then
+            if not __continue144 then
                 break
             end
         end
@@ -13257,25 +13791,25 @@ end
 function World.prototype.thankYouBlink(self, p)
     for ____, v in ipairs(self.vehicles) do
         do
-            local __continue140
+            local __continue152
             repeat
                 local d = self.drivers:get(v.id)
                 if d == nil or d.emo:grudgeAgainst(p.id) <= 0 then
-                    __continue140 = true
+                    __continue152 = true
                     break
                 end
                 local dx = v.x - p.x
                 local dy = v.y - p.y
                 local behind = dx * math.cos(p.heading) + dy * math.sin(p.heading) < 0
                 if not behind or dx * dx + dy * dy > 50 * 50 then
-                    __continue140 = true
+                    __continue152 = true
                     break
                 end
                 local calmed = d.emo:apologize(p.id, self.time) * 0.6
                 self.events:emit({type = "apology", from = p.id, to = v.id, calmed = calmed})
-                __continue140 = true
+                __continue152 = true
             until true
-            if not __continue140 then
+            if not __continue152 then
                 break
             end
         end
@@ -13284,34 +13818,34 @@ end
 function World.prototype.flashAhead(self, p)
     for ____, v in ipairs(self.vehicles) do
         do
-            local __continue145
+            local __continue157
             repeat
                 if v == p then
-                    __continue145 = true
+                    __continue157 = true
                     break
                 end
                 local dx = v.x - p.x
                 local dy = v.y - p.y
                 local fwd = dx * math.cos(p.heading) + dy * math.sin(p.heading)
                 if fwd < 0 or fwd > 45 then
-                    __continue145 = true
+                    __continue157 = true
                     break
                 end
                 local side = math.abs(-dx * math.sin(p.heading) + dy * math.cos(p.heading))
                 if side > 3 + fwd * 0.15 then
-                    __continue145 = true
+                    __continue157 = true
                     break
                 end
                 local last = self.flashMemo:get(v.id) or -10
                 if self.time - last < 1.5 then
-                    __continue145 = true
+                    __continue157 = true
                     break
                 end
                 self.flashMemo:set(v.id, self.time)
                 self:offend(p, v, "high_beams", 1)
-                __continue145 = true
+                __continue157 = true
             until true
-            if not __continue145 then
+            if not __continue157 then
                 break
             end
         end
@@ -13323,11 +13857,11 @@ function World.prototype.physics(self, dt)
         local i = 0
         while i < #self.vehicles do
             do
-                local __continue152
+                local __continue164
                 repeat
                     local v = self.vehicles[i + 1]
                     if v.mode ~= "physics" then
-                        __continue152 = true
+                        __continue164 = true
                         break
                     end
                     local pt = v.pt
@@ -13370,9 +13904,9 @@ function World.prototype.physics(self, dt)
                             self.record:driveClean(dyn:absSpeed() * dt)
                         end
                     end
-                    __continue152 = true
+                    __continue164 = true
                 until true
-                if not __continue152 then
+                if not __continue164 then
                     break
                 end
             end
@@ -13383,11 +13917,11 @@ function World.prototype.physics(self, dt)
         local i = 0
         while i < #self.vehicles do
             do
-                local __continue157
+                local __continue169
                 repeat
                     local v = self.vehicles[i + 1]
                     if v.mode ~= "lane" then
-                        __continue157 = true
+                        __continue169 = true
                         break
                     end
                     local spec = v.spec
@@ -13400,9 +13934,9 @@ function World.prototype.physics(self, dt)
                     end
                     v.gearEstimate = g
                     v.rpmEstimate = math.max(spec.idleRpm, wheel * spec.gears[g]) + math.max(0, v.accel) * 300
-                    __continue157 = true
+                    __continue169 = true
                 until true
-                if not __continue157 then
+                if not __continue169 then
                     break
                 end
             end
@@ -13421,26 +13955,26 @@ function World.prototype.collisions(self)
         local i = 0
         while i < #self.vehicles do
             do
-                local __continue165
+                local __continue177
                 repeat
                     local a = self.vehicles[i + 1]
                     if not a.alive then
-                        __continue165 = true
+                        __continue177 = true
                         break
                     end
                     self.queryBuf = {}
                     self.vehicleHash:query(a.x, a.y, a.halfLen + 2, self.queryBuf)
                     for ____, b in ipairs(self.queryBuf) do
                         do
-                            local __continue167
+                            local __continue179
                             repeat
                                 if b.id <= a.id or not b.alive then
-                                    __continue167 = true
+                                    __continue179 = true
                                     break
                                 end
                                 if a.mode == "lane" and b.mode == "lane" then
                                     if not lanePairCanCollide(a, b) then
-                                        __continue167 = true
+                                        __continue179 = true
                                         break
                                     end
                                     local shrink = 0.85
@@ -13451,13 +13985,13 @@ function World.prototype.collisions(self)
                                     setBox(boxB, b, 1)
                                 end
                                 if not boxContact(boxA, boxB, contact) then
-                                    __continue167 = true
+                                    __continue179 = true
                                     break
                                 end
                                 self:resolveVehicles(a, b)
-                                __continue167 = true
+                                __continue179 = true
                             until true
-                            if not __continue167 then
+                            if not __continue179 then
                                 break
                             end
                         end
@@ -13465,9 +13999,9 @@ function World.prototype.collisions(self)
                     if a.mode == "physics" then
                         self:staticCollisions(a)
                     end
-                    __continue165 = true
+                    __continue177 = true
                 until true
-                if not __continue165 then
+                if not __continue177 then
                     break
                 end
             end
@@ -13593,11 +14127,11 @@ function World.prototype.staticCollisions(self, v)
     self.obstacleHash:query(v.x, v.y, v.halfLen + 1, self.obstacleBuf)
     for ____, o in ipairs(self.obstacleBuf) do
         do
-            local __continue191
+            local __continue203
             repeat
                 setBox(boxA, v, 1)
                 if not boxContact(boxA, o, contact) then
-                    __continue191 = true
+                    __continue203 = true
                     break
                 end
                 local j = resolveStatic(v.dyn, contact, 0.12, 0.5)
@@ -13619,9 +14153,9 @@ function World.prototype.staticCollisions(self, v)
                         d:onCrash(self, sev)
                     end
                 end
-                __continue191 = true
+                __continue203 = true
             until true
-            if not __continue191 then
+            if not __continue203 then
                 break
             end
         end
@@ -13770,16 +14304,16 @@ function World.prototype.playerSocial(self, dt, p)
             local i = 0
             while i < lane.occCount do
                 do
-                    local __continue224
+                    local __continue236
                     repeat
                         local e = lane.occ[i + 1]
                         if e.occ.id == p.id then
-                            __continue224 = true
+                            __continue236 = true
                             break
                         end
                         local v = self.byId:get(e.occ.id)
                         if v == nil then
-                            __continue224 = true
+                            __continue236 = true
                             break
                         end
                         local d = (v.x - p.x) * math.cos(p.heading) + (v.y - p.y) * math.sin(p.heading)
@@ -13787,9 +14321,9 @@ function World.prototype.playerSocial(self, dt, p)
                             best = d
                             leader = v
                         end
-                        __continue224 = true
+                        __continue236 = true
                     until true
-                    if not __continue224 then
+                    if not __continue236 then
                         break
                     end
                 end
@@ -13811,10 +14345,10 @@ function World.prototype.playerSocial(self, dt, p)
         self.vehicleHash:query(p.x, p.y, 6, self.queryBuf)
         for ____, v in ipairs(self.queryBuf) do
             do
-                local __continue232
+                local __continue244
                 repeat
                     if v == p then
-                        __continue232 = true
+                        __continue244 = true
                         break
                     end
                     local d = hypot(v.x - p.x, v.y - p.y) - (v.halfWid + p.halfWid)
@@ -13825,7 +14359,7 @@ function World.prototype.playerSocial(self, dt, p)
                     if d < 1.2 and rel > 7 then
                         local last = self.nearMissMemo:get(v.id) or -10
                         if self.time - last < 3 then
-                            __continue232 = true
+                            __continue244 = true
                             break
                         end
                         self.nearMissMemo:set(v.id, self.time)
@@ -13837,11 +14371,75 @@ function World.prototype.playerSocial(self, dt, p)
                             clamp(rel / 12, 0.5, 2)
                         )
                     end
-                    __continue232 = true
+                    __continue244 = true
                 until true
-                if not __continue232 then
+                if not __continue244 then
                     break
                 end
+            end
+        end
+    end
+end
+function World.prototype.updatePedestrians(self, dt)
+    local night = 1 - self.env.daylight
+    self.peds.target = math.floor(self.pedestrianDensity * (1 - night * 0.6) * (0.5 + self.env.trafficDensity * 0.5) * (1 - self.env.rain * 0.5) + 0.5)
+    self.peds:update(dt, self.pedHost)
+    for ____, ped in ipairs(self.peds.peds) do
+        do
+            local __continue250
+            repeat
+                if ped.state ~= "crossing" and ped.state ~= "waiting" then
+                    __continue250 = true
+                    break
+                end
+                self.queryBuf = {}
+                self.vehicleHash:query(ped.x, ped.y, 4, self.queryBuf)
+                for ____, v in ipairs(self.queryBuf) do
+                    local c = math.cos(v.heading)
+                    local s = math.sin(v.heading)
+                    local lx = (ped.x - v.x) * c + (ped.y - v.y) * s
+                    local ly = -(ped.x - v.x) * s + (ped.y - v.y) * c
+                    local inside = math.abs(lx) < v.halfLen + 0.3 and math.abs(ly) < v.halfWid + 0.3
+                    local speed = v:absSpeed()
+                    if inside and speed > 1.2 and (v.mode == "physics" or ped.state == "crossing") then
+                        ped.state = "down"
+                        ped.ttl = 40
+                        self.events:emit({
+                            type = "ped_hit",
+                            ped = ped.id,
+                            vehicle = v.id,
+                            severity = speed,
+                            x = ped.x,
+                            y = ped.y
+                        })
+                        if speed > 4 then
+                            self:requestAmbulance(ped.x, ped.y)
+                        end
+                        if v.isPlayer then
+                            self:observe({kind = "hit_pedestrian"})
+                            self.monitor.hitRun = {
+                                x = v.x,
+                                y = v.y,
+                                time = self.time,
+                                stoppedFor = 0,
+                                victim = -1
+                            }
+                        end
+                        break
+                    end
+                    local near = math.abs(ly) < v.halfWid + 1.6 and lx > -v.halfLen and lx < v.halfLen + 2.5
+                    if near and ped.state == "crossing" and speed > 2.5 and ped.shoutCooldown <= 0 then
+                        ped.shoutCooldown = 5
+                        self.pedHost.onShout(ped)
+                        if v.isPlayer then
+                            self:observe({kind = "fail_yield_pedestrian"})
+                        end
+                    end
+                end
+                __continue250 = true
+            until true
+            if not __continue250 then
+                break
             end
         end
     end
@@ -13934,20 +14532,20 @@ function World.prototype.angryAtPlayer(self)
     end
     for ____, v in ipairs(self.vehicles) do
         do
-            local __continue256
+            local __continue279
             repeat
                 local d = self.drivers:get(v.id)
                 if d == nil then
-                    __continue256 = true
+                    __continue279 = true
                     break
                 end
                 local g = d.emo:grudgeAgainst(p.id)
                 if g > 10 and hypot(v.x - p.x, v.y - p.y) < 120 then
                     out[#out + 1] = {vehicle = v, anger = d.emo.anger, raging = d.rage ~= nil and d.rage.target == p.id}
                 end
-                __continue256 = true
+                __continue279 = true
             until true
-            if not __continue256 then
+            if not __continue279 then
                 break
             end
         end
@@ -13961,6 +14559,14 @@ end
 function World.prototype.isAngleAligned(self, a, b)
     return math.abs(angleDiff(a.heading, b.heading)) < 30 * DEG
 end
+PED_SHOUTS = {
+    "Hey! I'm walking here!",
+    "Watch it!",
+    "It's a crosswalk!",
+    "Slow down!",
+    "Are you blind?!",
+    "Jeez!"
+}
 return ____exports
  end,
 ["src.core.index"] = function(...) 

@@ -137,6 +137,16 @@ export class Hud {
     }
   }
 
+  private pedBubbles: { el: HTMLDivElement; x: number; y: number; ttl: number }[] = [];
+
+  pedSpeech(x: number, y: number, text: string): void {
+    const el = document.createElement("div");
+    el.className = "bubble ped";
+    el.textContent = text;
+    $("bubbles").appendChild(el);
+    this.pedBubbles.push({ el, x, y, ttl: 3 });
+  }
+
   onEvent(e: SimEvent): void {
     const w = this.world;
     const p = w.player;
@@ -186,6 +196,12 @@ export class Hud {
         break;
       case "info":
         this.toast(e.text, "info");
+        break;
+      case "ped_speech":
+        if (p !== undefined && Math.hypot(e.x - p.x, e.y - p.y) < 50) this.pedSpeech(e.x, e.y, e.text);
+        break;
+      case "ped_hit":
+        if (e.vehicle === me) this.toast("You hit a pedestrian", "violation", "An ambulance is on the way");
         break;
       default:
         break;
@@ -530,6 +546,18 @@ export class Hud {
   }
 
   private updateBubbles(dt: number, camera: THREE.PerspectiveCamera): void {
+    for (let i = this.pedBubbles.length - 1; i >= 0; i--) {
+      const b = this.pedBubbles[i];
+      b.ttl -= dt;
+      if (b.ttl <= 0) {
+        b.el.remove();
+        this.pedBubbles.splice(i, 1);
+        continue;
+      }
+      const s = this.project(camera, b.x, b.y, 2.3);
+      b.el.style.transform = `translate(${s.x}px, ${s.y}px) translate(-50%, -100%)`;
+      b.el.style.opacity = s.visible ? `${Math.min(1, b.ttl * 2)}` : "0";
+    }
     for (let i = this.bubbles.length - 1; i >= 0; i--) {
       const b = this.bubbles[i];
       b.ttl -= dt;

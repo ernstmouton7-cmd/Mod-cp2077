@@ -29,4 +29,6 @@ export type SimEvent =
   | { type: "shift"; vehicle: number; gear: string }
   | { type: "spawn"; vehicle: number }
   | { type: "despawn"; vehicle: number }
+  | { type: "ped_speech"; ped: number; text: string; x: number; y: number }
+  | { type: "ped_hit"; ped: number; vehicle: number; severity: number; x: number; y: number }
   | { type: "info"; text: string };

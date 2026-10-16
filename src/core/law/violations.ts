@@ -19,7 +19,9 @@ export type ViolationKind =
   | "reckless"
   | "blocking_box"
   | "horn_abuse"
-  | "evading";
+  | "evading"
+  | "fail_yield_pedestrian"
+  | "hit_pedestrian";
 
 export interface ViolationDef {
   label: string;
@@ -55,6 +57,8 @@ export const VIOLATIONS: Record<ViolationKind, ViolationDef> = {
   blocking_box: { label: "Blocking the intersection", fine: 150, points: 1, heat: 1, cooldown: 20 },
   horn_abuse: { label: "Unnecessary use of horn", fine: 50, points: 0, heat: 1, cooldown: 30 },
   evading: { label: "Evading police", fine: 2500, points: 8, heat: 3, cooldown: 60 },
+  fail_yield_pedestrian: { label: "Failure to yield to a pedestrian", fine: 350, points: 3, heat: 1, cooldown: 8 },
+  hit_pedestrian: { label: "Hit a pedestrian", fine: 5000, points: 8, heat: 3, cooldown: 5 },
 };
 
 export type Witness = "police" | "camera" | "none";

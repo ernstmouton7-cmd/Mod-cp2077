@@ -9,7 +9,7 @@ import type { SimContext } from "../world/context";
 import { brakeToStop, driveToward } from "./control";
 import { Emotion, Mood } from "./emotion";
 import { idmAccel, idmFree, IdmParams } from "./idm";
-import { approachStopDistance, connectorStopDistance, DriverView, JunctionState } from "./intersection";
+import { approachStopDistance, connectorStopDistance, DriverView, JunctionState, pedestrianStopDistance } from "./intersection";
 import { Personality } from "./personality";
 import { lineFor } from "./speech";
 
@@ -387,6 +387,13 @@ export class AIDriver implements DriverView {
       if (this.emergency && this.next.node.control === "signal" && seg.length - v.s < 120) ctx.signals[this.next.node.signalId].requestPreempt(this.next.approach);
     } else if (seg.kind === "connector") {
       this.stopDist = connectorStopDistance(ctx, this, seg as Connector, dt);
+    }
+    // Pedestrians on crosswalks along our movement (turning traffic yields to them).
+    if (seg.kind === "lane" && this.next !== undefined) {
+      const toLine = seg.length - v.s - v.halfLen;
+      if (toLine < 50) this.stopDist = Math.min(this.stopDist, pedestrianStopDistance(ctx, v, this.next, toLine, 0));
+    } else if (seg.kind === "connector") {
+      this.stopDist = Math.min(this.stopDist, pedestrianStopDistance(ctx, v, seg as Connector, 0, v.s + v.halfLen));
     }
     // End of a lane with no exit at all: stop.
     if (seg.kind === "lane" && this.next === undefined) this.stopDist = Math.min(this.stopDist, seg.length - v.s - v.halfLen);

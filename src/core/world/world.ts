@@ -23,6 +23,8 @@ import { AllWayQueue, SimContext } from "./context";
 import { Environment } from "./environment";
 import { SimEvent } from "./events";
 import { Spawner } from "./spawner";
+import { Pedestrian, PedestrianSystem, PedHost } from "../ai/pedestrians";
+import { buildCrosswalks, Crosswalk, CrosswalkCrossing } from "../road/crosswalks";
 
 export interface WorldOptions {
   seed?: number;
@@ -80,6 +82,11 @@ export class World implements SimContext {
   readonly hostActions: ActionId[] = [];
   /** Static obstacles (buildings, boundary walls). */
   readonly obstacles: Box[] = [];
+  readonly crosswalks: Crosswalk[];
+  readonly crossings: Map<number, CrosswalkCrossing[]>;
+  readonly peds: PedestrianSystem;
+  /** Base pedestrian count at daytime peak. */
+  pedestrianDensity = 45;
 
   private readonly drivers: Map<number, AIDriver> = new Map();
   private readonly byId: Map<number, Vehicle> = new Map();
@@ -122,6 +129,10 @@ export class World implements SimContext {
     this.env = new Environment(seed + 1, opts.startHour ?? 19.5);
     this.buildSignals();
     this.buildObstacles();
+    const cw = buildCrosswalks(this.net);
+    this.crosswalks = cw.crosswalks;
+    this.crossings = cw.crossings;
+    this.peds = new PedestrianSystem(this.crosswalks, this.rng.fork());
     const host = {
       rng: this.rng,
       vehicles: this.vehicles,
@@ -401,6 +412,7 @@ export class World implements SimContext {
         d.lastMood = d.emo.mood;
       }
     }
+    this.updatePedestrians(dt);
     this.physics(dt);
     this.collisions();
     this.lawAndOrder(dt);
@@ -859,6 +871,81 @@ export class World implements SimContext {
     }
   }
 
+  // ----------------------------------------------------------- pedestrians
+
+  private readonly pedHost: PedHost = {
+    signals: this.signals,
+    trafficApproaching: (x: number, y: number, radius: number, seconds: number): boolean => {
+      for (const v of this.vehicles) {
+        const dx = x - v.x;
+        const dy = y - v.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d > radius + v.absSpeed() * seconds + 3) continue;
+        if (d < radius + 2) return true;
+        // Heading toward the crossing?
+        const toward = (dx * Math.cos(v.heading) + dy * Math.sin(v.heading)) / Math.max(d, 0.1);
+        if (toward > 0.6 && v.absSpeed() > 1) return true;
+      }
+      return false;
+    },
+    vehicleAt: (x: number, y: number, margin: number): boolean => {
+      for (const v of this.vehicles) {
+        const dx = x - v.x;
+        const dy = y - v.y;
+        if (Math.abs(dx) > v.halfLen + margin + 1 || Math.abs(dy) > v.halfLen + margin + 1) continue;
+        const c = Math.cos(v.heading);
+        const s = Math.sin(v.heading);
+        const lx = dx * c + dy * s;
+        const ly = -dx * s + dy * c;
+        if (Math.abs(lx) < v.halfLen + margin && Math.abs(ly) < v.halfWid + margin) return true;
+      }
+      return false;
+    },
+    onShout: (p: Pedestrian): void => {
+      this.events.emit({ type: "ped_speech", ped: p.id, text: this.rng.pick(PED_SHOUTS), x: p.x, y: p.y });
+    },
+  };
+
+  private updatePedestrians(dt: number): void {
+    const night = 1 - this.env.daylight;
+    this.peds.target = Math.round(this.pedestrianDensity * (1 - night * 0.6) * (0.5 + this.env.trafficDensity * 0.5) * (1 - this.env.rain * 0.5));
+    this.peds.update(dt, this.pedHost);
+    // Vehicles touching pedestrians.
+    for (const ped of this.peds.peds) {
+      if (ped.state !== "crossing" && ped.state !== "waiting") continue;
+      this.queryBuf = [];
+      this.vehicleHash.query(ped.x, ped.y, 4, this.queryBuf);
+      for (const v of this.queryBuf) {
+        // Pedestrian position in the vehicle frame.
+        const c = Math.cos(v.heading);
+        const s = Math.sin(v.heading);
+        const lx = (ped.x - v.x) * c + (ped.y - v.y) * s;
+        const ly = -(ped.x - v.x) * s + (ped.y - v.y) * c;
+        const inside = Math.abs(lx) < v.halfLen + 0.3 && Math.abs(ly) < v.halfWid + 0.3;
+        const speed = v.absSpeed();
+        // Lane-bound cars can't mount the sidewalk: only people in the road count for them.
+        if (inside && speed > 1.2 && (v.mode === "physics" || ped.state === "crossing")) {
+          ped.state = "down";
+          ped.ttl = 40;
+          this.events.emit({ type: "ped_hit", ped: ped.id, vehicle: v.id, severity: speed, x: ped.x, y: ped.y });
+          if (speed > 4) this.requestAmbulance(ped.x, ped.y);
+          if (v.isPlayer) {
+            this.observe({ kind: "hit_pedestrian" });
+            this.monitor.hitRun = { x: v.x, y: v.y, time: this.time, stoppedFor: 0, victim: -1 };
+          }
+          break;
+        }
+        // Close pass in front of someone crossing: they shout, the player is charged.
+        const near = Math.abs(ly) < v.halfWid + 1.6 && lx > -v.halfLen && lx < v.halfLen + 2.5;
+        if (near && ped.state === "crossing" && speed > 2.5 && ped.shoutCooldown <= 0) {
+          ped.shoutCooldown = 5;
+          this.pedHost.onShout(ped);
+          if (v.isPlayer) this.observe({ kind: "fail_yield_pedestrian" });
+        }
+      }
+    }
+  }
+
   // ----------------------------------------------------------- ambulances
 
   private requestAmbulance(x: number, y: number): void {
@@ -946,6 +1033,8 @@ export class World implements SimContext {
     return Math.abs(angleDiff(a.heading, b.heading)) < 30 * DEG;
   }
 }
+
+const PED_SHOUTS = ["Hey! I'm walking here!", "Watch it!", "It's a crosswalk!", "Slow down!", "Are you blind?!", "Jeez!"];
 
 function lanePairCanCollide(a: Vehicle, b: Vehicle): boolean {
   const sa = a.seg;

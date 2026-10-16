@@ -128,6 +128,8 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .bubble { position: absolute; left: 0; top: 0; background: var(--sign-white); color: var(--sign-black); font-weight: 800; font-size: 0.78rem; padding: 4px 9px; border-radius: 10px; white-space: nowrap; transition: opacity 0.2s; }
 .bubble::after { content: ""; position: absolute; left: 50%; bottom: -6px; border: 6px solid transparent; border-top-color: var(--sign-white); border-bottom: 0; transform: translateX(-50%); }
 .bubble.mood-angry, .bubble.mood-furious { background: var(--neon); color: #fff; }
+.bubble.ped { background: var(--sodium); color: var(--sign-black); font-size: 0.72rem; }
+.bubble.ped::after { border-top-color: var(--sodium); }
 .bubble.mood-angry::after, .bubble.mood-furious::after { border-top-color: var(--neon); }
 .dbg { position: absolute; left: 0; top: 0; font-family: var(--font-mono); font-size: 0.6rem; background: rgba(0, 0, 0, 0.65); color: var(--sig-green); padding: 1px 4px; white-space: nowrap; }
 

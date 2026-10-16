@@ -16,6 +16,7 @@ import { Hud } from "./hud";
 import { loadSettings, Menu, saveSettings, Settings } from "./menu";
 import { SignalView } from "./signalView";
 import { PoseHistory, VehicleView } from "./vehicleView";
+import { PedView } from "./pedView";
 
 declare global {
   interface Window {
@@ -66,7 +67,8 @@ function boot(snap: Record<string, unknown>): void {
   vehicles.bodyMat.envMap = envMap;
   city.setEnvMap(envMap);
   const fx = new Effects();
-  scene.add(city.group, signals.group, vehicles.group, fx.group);
+  const peds = new PedView();
+  scene.add(city.group, signals.group, vehicles.group, fx.group, peds.group);
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, rig.camera));
   const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.9, 0.5, 0.82);
@@ -244,6 +246,7 @@ function boot(snap: Record<string, unknown>): void {
     vehicles.hidePlayerGlow = rig.onGlass;
     vehicles.update(world, hist, alpha, camPos, nightK);
     fx.update(dt, world, camPos, env.rain);
+    peds.update(world);
     const pd = world.playerDriver;
     if (p !== undefined && pd !== undefined) {
       hud.update(dt, rig.camera, pd.gearText(), pd.cruise, pd.limiterOn, pd.seatbelt, pd.notes);

@@ -57,7 +57,7 @@ const AVENUE_NAMES = ["Meridian Ave", "Vanta Ave", "Arcadia Ave", "Helix Ave"];
 function lineSpecs(count: number, rng: Rng, axis: "col" | "row"): LineSpec[] {
   const specs: LineSpec[] = [];
   let oneWayToggle = rng.chance(0.5);
-  let avenueIdx = 0;
+  let avenueIdx = axis === "col" ? 0 : 2;
   let streetIdx = axis === "col" ? 0 : 7;
   for (let i = 0; i < count; i++) {
     let s: LineSpec;

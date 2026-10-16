@@ -448,6 +448,41 @@ export function connectorStopDistance(ctx: SimContext, d: DriverView, c: Connect
   return stopAt;
 }
 
+/**
+ * Distance (from our front bumper) at which to stop for pedestrians on a
+ * crosswalk that connector `c` crosses, or Infinity. `ahead` is the distance
+ * from our front bumper to the start of `c` (negative once on it).
+ */
+export function pedestrianStopDistance(ctx: SimContext, me: Vehicle, c: Connector, ahead: number, frontOnC: number): number {
+  const list = ctx.crossings.get(c.id);
+  if (list === undefined) return Infinity;
+  for (const x of list) {
+    if (x.s < frontOnC - 0.3) continue; // already over it
+    const dist = ahead + x.s - Math.max(frontOnC, 0) - 1.6;
+    if (dist > 45) break;
+    if (!ctx.peds.blocking(x.cw, x.t, 1.7)) continue;
+    if (dist > 0) return dist;
+    // Too late to stop short of it: keep clearing the crosswalk unless someone is
+    // right in front of the bumper (otherwise car and pedestrian wait for each other).
+    if (pedInFront(ctx, me)) return 0;
+  }
+  return Infinity;
+}
+
+function pedInFront(ctx: SimContext, me: Vehicle): boolean {
+  const c = Math.cos(me.heading);
+  const s = Math.sin(me.heading);
+  for (const p of ctx.peds.peds) {
+    if (p.state !== "crossing") continue;
+    const dx = p.x - me.x;
+    const dy = p.y - me.y;
+    const lx = dx * c + dy * s;
+    const ly = -dx * s + dy * c;
+    if (lx > me.halfLen - 0.5 && lx < me.halfLen + 2.5 && Math.abs(ly) < me.halfWid + 0.6) return true;
+  }
+  return false;
+}
+
 export function nodeOf(c: Connector): Node {
   return c.node;
 }

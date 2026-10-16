@@ -7,6 +7,8 @@ import type { SignalController } from "../signals/signalController";
 import type { EventBus } from "../util/events";
 import type { Vehicle } from "../vehicle/vehicle";
 import type { Environment } from "./environment";
+import type { PedestrianSystem } from "../ai/pedestrians";
+import type { CrosswalkCrossing } from "../road/crosswalks";
 import type { SimEvent } from "./events";
 
 /** All-way stop bookkeeping: arrival order per node. */
@@ -34,6 +36,9 @@ export interface SimContext {
   allWay(nodeId: number): AllWayQueue;
   /** Police units within range of a point that can see it. */
   policeNear(x: number, y: number, range: number): Vehicle[];
+  /** Pedestrians on crosswalks, and where each connector crosses a crosswalk. */
+  readonly peds: PedestrianSystem;
+  readonly crossings: Map<number, CrosswalkCrossing[]>;
   /** Unobstructed line of sight (buildings block). */
   los(ax: number, ay: number, bx: number, by: number): boolean;
 }

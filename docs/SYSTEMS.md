@@ -160,6 +160,8 @@ Violations (*generated*):
 | Blocking the intersection | 150 | 1 | 1 |
 | Unnecessary use of horn | 50 | 0 | 1 |
 | Evading police | 2500 | 8 | 3 |
+| Failure to yield to a pedestrian | 350 | 3 | 1 |
+| Hit a pedestrian | 5000 | 8 | 3 |
 <!-- /gen -->
 
 **Witnesses.** A police unit within 110 m with line of sight (buildings block),
