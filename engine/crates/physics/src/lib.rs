@@ -19,6 +19,7 @@ pub mod arena;
 pub mod body;
 pub mod broadphase;
 pub mod bvh;
+pub mod deform;
 pub mod gjk;
 pub mod joint;
 pub mod math;

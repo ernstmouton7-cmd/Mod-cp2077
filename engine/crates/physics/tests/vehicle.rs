@@ -308,3 +308,95 @@ fn crash_into_wall_reports_impact() {
     assert!(impulse > 1550.0 * sp * 0.4, "impulse too small");
     assert!(chassis(&w, v).pose.p.z > -40.0, "drove through the wall");
 }
+
+#[test]
+fn crash_deforms_body_and_breaks_parts() {
+    use gridlock_physics::deform::*;
+    let mut w = flat_world();
+    w.add_body_with(
+        BodyDesc::fixed(Pose::from_translation(Vec3::new(0.0, 1.0, -60.0))),
+        ColliderDesc::new(Shape::cuboid(Vec3::new(10.0, 1.0, 0.5))),
+    );
+    let v = spawn(&mut w, VehicleClass::Sedan);
+    let size = w.vehicle(v).unwrap().desc.size;
+    let body = DeformMesh::grid_box(
+        Vec3::new(0.0, 0.75, 0.0),
+        Vec3::new(size.y * 0.5, 0.55, size.x * 0.5),
+        12,
+    );
+    let hl = size.x * 0.5;
+    let parts = vec![
+        PartDesc {
+            name: "front bumper".into(),
+            kind: PartKind::FrontBumper,
+            mount: PartMount::Fixed,
+            mesh: DeformMesh::grid_box(
+                Vec3::new(0.0, 0.45, -hl - 0.05),
+                Vec3::new(0.9, 0.15, 0.08),
+                4,
+            ),
+            mass: 8.0,
+            strength: 9000.0,
+        },
+        PartDesc {
+            name: "hood".into(),
+            kind: PartKind::Hood,
+            mount: PartMount::Hinge {
+                pivot: Vec3::new(0.0, 1.0, -0.9),
+                axis: Vec3::X,
+                lower: -1.2,
+                upper: 0.0,
+            },
+            mesh: DeformMesh::grid_box(Vec3::new(0.0, 1.0, -1.7), Vec3::new(0.85, 0.03, 0.75), 4),
+            mass: 15.0,
+            strength: 14000.0,
+        },
+    ];
+    let mut dmg = VehicleDamage::new(v, body, parts, 4);
+    controls(&mut w, v, 1.0, 0.0, 0.0);
+    let mut events = Vec::new();
+    for _ in 0..900 {
+        w.step(DT);
+        events.extend(dmg.process(&mut w));
+        events.extend(dmg.update(&w));
+    }
+    let max_dent = dmg
+        .body
+        .positions
+        .iter()
+        .zip(&dmg.body.rest)
+        .map(|(p, r)| (*p - *r).length())
+        .fold(0.0, f32::max);
+    let front_dent = dmg
+        .body
+        .positions
+        .iter()
+        .zip(&dmg.body.rest)
+        .filter(|(_, r)| r.z < -hl * 0.8)
+        .map(|(p, r)| p.z - r.z)
+        .fold(0.0, f32::max);
+    let rear_dent = dmg
+        .body
+        .positions
+        .iter()
+        .zip(&dmg.body.rest)
+        .filter(|(_, r)| r.z > hl * 0.8)
+        .map(|(p, r)| (*p - *r).length())
+        .fold(0.0, f32::max);
+    let engine = w.vehicle(v).unwrap().damage.engine;
+    eprintln!("crash: max dent {max_dent:.3} m, front pushed back {front_dent:.3} m, rear {rear_dent:.3}, engine {engine:.2}, events {}", events.len());
+    assert!(front_dent > 0.05, "front should crumple backwards");
+    assert!(rear_dent < 0.02, "rear untouched");
+    assert!(max_dent <= 0.45 + 1e-3);
+    assert!(engine < 1.0);
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, DamageEvent::PartDetached { part: 0, .. })),
+        "bumper should come off"
+    );
+    assert!(
+        dmg.parts[1].state != PartState::Attached,
+        "hood should be unlatched"
+    );
+}
