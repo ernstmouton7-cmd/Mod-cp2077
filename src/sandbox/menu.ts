@@ -28,6 +28,7 @@ export interface Settings {
   bloom: boolean;
   quality: "high" | "low";
   vehicle: VehicleClass;
+  mirror: boolean;
 }
 
 const STORE = "gridlock.settings.v1";
@@ -215,6 +216,7 @@ export class Menu {
       this.world.outageInterval = el.checked ? 300 : 0;
     });
     bind("setBloom", "change", (el) => (this.settings.bloom = el.checked));
+    bind("setMirror", "change", (el) => (this.settings.mirror = el.checked));
     bind("setQuality", "change", (el) => (this.settings.quality = el.value as "high" | "low"));
     bind("setSignals", "change", (el) => {
       for (const s of this.world.signals) s.setMode(el.value as "actuated");
@@ -254,6 +256,7 @@ export class Menu {
     set("setVolume", `${this.settings.volume}`);
     set("setIncidents", this.world.breakdownInterval > 0);
     set("setBloom", this.settings.bloom);
+    set("setMirror", this.settings.mirror);
     set("setQuality", this.settings.quality);
     const s0 = this.world.signals[0];
     if (s0 !== undefined) set("setSignals", s0.mode);

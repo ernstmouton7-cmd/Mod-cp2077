@@ -28,6 +28,7 @@ export class AudioEngine {
   private sirenPan!: StereoPannerNode;
   private noise!: AudioBuffer;
   private lastBlink = false;
+  private reverseBeep = 0;
   private sirenPhase = 0;
   volume = 0.7;
   muted = false;
@@ -253,6 +254,15 @@ export class AudioEngine {
         this.beep(880, 0.12, 0.12, "triangle");
         this.beep(660, 0.18, 0.12, "triangle", 0, 0.13);
         break;
+      case "grind":
+        if (e.vehicle === p.id) {
+          this.noiseBurst(0.35, 0.35, 2500);
+          this.beep(180, 0.3, 0.12, "sawtooth");
+        }
+        break;
+      case "chime":
+        if (e.vehicle === p.id) this.chime();
+        break;
       case "shift":
         if (e.vehicle === p.id) this.noiseBurst(0.05, 0.12, 3000);
         break;
@@ -297,6 +307,15 @@ export class AudioEngine {
       if (p.lights.indicator !== "off" || p.lights.hazard) this.noiseBurst(0.025, blink ? 0.22 : 0.15, blink ? 5000 : 3000);
       this.lastBlink = blink;
     }
+    // Reverse warning beeper on commercial vehicles.
+    const beeper = spec.id === "truck" || spec.id === "bus" || spec.id === "van" || spec.id === "ambulance";
+    if (beeper && p.lights.reverse && pt.running) {
+      this.reverseBeep -= dt;
+      if (this.reverseBeep <= 0) {
+        this.reverseBeep = 1.0;
+        this.beep(1050, 0.45, 0.1, "square");
+      }
+    } else this.reverseBeep = 0;
     // Nearest siren.
     let best: Vehicle | undefined = undefined;
     let bd = 220;

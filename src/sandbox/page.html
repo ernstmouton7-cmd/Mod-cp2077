@@ -8,6 +8,7 @@
   <canvas id="view" aria-label="3D city driving view"></canvas>
   <canvas id="glass" aria-hidden="true"></canvas>
   <div id="flash" aria-hidden="true"></div>
+  <div id="mirror" class="mirror" hidden aria-hidden="true"></div>
   <div id="bubbles" aria-live="off"></div>
   <div id="debugLayer" hidden></div>
 
@@ -143,6 +144,7 @@
           <label class="check" for="setIncidents"><input type="checkbox" id="setIncidents"> Incidents (breakdowns, power cuts)</label>
           <label for="setVolume">Volume<input type="range" id="setVolume" min="0" max="1" step="0.05"></label>
           <label class="check" for="setBloom"><input type="checkbox" id="setBloom"> Neon bloom</label>
+          <label class="check" for="setMirror"><input type="checkbox" id="setMirror"> Rear-view mirror (hood and cockpit cameras)</label>
           <label for="setQuality">Quality (reload to apply)<select id="setQuality"><option value="high">High</option><option value="low">Low</option></select></label>
         </div>
       </div>

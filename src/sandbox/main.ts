@@ -35,6 +35,7 @@ function boot(snap: Record<string, unknown>): void {
     bloom: stored.bloom ?? !mobile,
     quality: stored.quality ?? (mobile ? "low" : "high"),
     vehicle: (stored.vehicle as VehicleClass | undefined) ?? "sports",
+    mirror: stored.mirror ?? true,
   };
   const world = new World({ seed: 2077, traffic: mobile ? 70 : 110, police: 4, startHour: typeof snap.hour === "number" ? snap.hour : 20.75, playerVehicle: settings.vehicle });
   if (stored.keys !== undefined) for (const id of Object.keys(stored.keys)) world.input.bindKeys(id as ActionId, stored.keys[id]);
@@ -60,6 +61,7 @@ function boot(snap: Record<string, unknown>): void {
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   const rig = new CameraRig(window.innerWidth / window.innerHeight);
+  (window as unknown as { gridlockRig: CameraRig }).gridlockRig = rig;
   const city = new CityView(world);
   const signals = new SignalView(world);
   const vehicles = new VehicleView();
@@ -69,6 +71,8 @@ function boot(snap: Record<string, unknown>): void {
   const fx = new Effects();
   const peds = new PedView();
   scene.add(city.group, signals.group, vehicles.group, fx.group, peds.group);
+  // Rear-view mirror camera (hood and cockpit views).
+  const mirrorCam = new THREE.PerspectiveCamera(48, 3.2, 0.5, 400);
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, rig.camera));
   const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.9, 0.5, 0.82);
@@ -256,6 +260,28 @@ function boot(snap: Record<string, unknown>): void {
     bloom.strength = 0.55 + nightK * 0.45;
     if (settings.bloom) composer.render();
     else renderer.render(scene, rig.camera);
+    // Mirror inset: top centre, drawn after the main view.
+    const mirrorEl = document.getElementById("mirror") as HTMLElement;
+    const showMirror = settings.mirror && rig.onGlass && p !== undefined && started;
+    mirrorEl.hidden = !showMirror;
+    if (showMirror && p !== undefined) {
+      const r = mirrorEl.getBoundingClientRect();
+      const h = Math.cos(pose.h);
+      const s = Math.sin(pose.h);
+      mirrorCam.position.set(pose.x, p.spec.height + 0.3, -pose.y);
+      mirrorCam.lookAt(pose.x - h * 30, 1.0, -(pose.y - s * 30));
+      mirrorCam.near = p.halfLen + 0.4; // clip our own car
+      mirrorCam.aspect = r.width / r.height;
+      mirrorCam.updateProjectionMatrix();
+      const H = window.innerHeight;
+      renderer.setScissorTest(true);
+      renderer.setViewport(r.left, H - r.bottom, r.width, r.height);
+      renderer.setScissor(r.left, H - r.bottom, r.width, r.height);
+      renderer.clearDepth();
+      renderer.render(scene, mirrorCam);
+      renderer.setScissorTest(false);
+      renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+    }
     fpsFrames++;
     fpsTime += dt;
     if (fpsTime > 1) {

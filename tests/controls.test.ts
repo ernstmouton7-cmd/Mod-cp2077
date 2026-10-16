@@ -64,3 +64,34 @@ test("gamepad analog triggers and stick map to pedals and steering", () => {
   m.gamepad(buttons, [0, 0, 0, 0]);
   assert.equal(m.frame(1 / 60, 0).handbrake, 1);
 });
+
+import { World } from "../src/core/world/world";
+
+test("manual gearbox without clutch assist grinds unless the clutch is pressed", () => {
+  const w = new World({ seed: 3, traffic: 0, police: 0 });
+  const pd = w.playerDriver!;
+  const p = w.player!;
+  pd.settings.clutchAssist = false;
+  w.input.press("transmission_mode");
+  w.step(1 / 60);
+  assert.equal(p.pt.mode, "manual");
+  // Neutral and a running engine (dropping into gear at a standstill would stall).
+  p.pt.shiftTo(0);
+  p.pt.running = true;
+  p.pt.stalled = false;
+  for (let i = 0; i < 30; i++) w.step(1 / 60);
+  assert.ok(p.pt.running);
+  const grinds: number[] = [];
+  w.events.on("grind", () => grinds.push(1));
+  const gear = p.pt.gear;
+  w.input.press("shift_up");
+  w.step(1 / 60);
+  assert.equal(grinds.length, 1, "grinds without clutch");
+  assert.equal(p.pt.gear, gear, "gear did not change");
+  w.input.set("clutch", 1);
+  for (let i = 0; i < 30; i++) w.step(1 / 60);
+  w.input.press("shift_up");
+  for (let i = 0; i < 40; i++) w.step(1 / 60);
+  assert.equal(grinds.length, 1);
+  assert.equal(p.pt.gear, gear + 1, "shifts with the clutch in");
+});

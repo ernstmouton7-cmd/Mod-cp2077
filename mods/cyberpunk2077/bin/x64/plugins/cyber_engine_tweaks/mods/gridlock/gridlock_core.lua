@@ -11855,9 +11855,7 @@ function InputMapper.prototype.frame(self, dt, speed)
     local released = {}
     local held = {}
     for ____, id in ipairs(self.pendingPress) do
-        if __TS__ArrayIndexOf(pressed, id) < 0 then
-            pressed[#pressed + 1] = id
-        end
+        pressed[#pressed + 1] = id
     end
     self.pendingPress = {}
     for ____, a in ipairs(____exports.ACTIONS) do
@@ -11958,6 +11956,7 @@ function PlayerDriver.prototype.____constructor(self, v)
     self.gesture = nil
     self.notes = {}
     self.wasStalled = false
+    self.clutchNow = 0
 end
 function PlayerDriver.prototype.gearText(self)
     local pt = self.v.pt
@@ -11982,6 +11981,7 @@ function PlayerDriver.prototype.update(self, dt, f, ctx, speedLimit)
     local pt = v.pt
     local lights = v.lights
     self.gesture = nil
+    self.clutchNow = f.clutch
     for ____, id in ipairs(f.pressed) do
         self:onPress(id, ctx, speedLimit)
     end
@@ -12100,18 +12100,25 @@ function PlayerDriver.prototype.update(self, dt, f, ctx, speedLimit)
         if self.seatbeltChime <= 0 then
             self.seatbeltChime = 6
             self:note("Fasten seatbelt (B)")
+            ctx.events:emit({type = "chime", vehicle = v.id, reason = "seatbelt"})
         end
     end
+end
+function PlayerDriver.prototype.grinds(self)
+    local pt = self.v.pt
+    return pt.mode == "manual" and not self.settings.clutchAssist and pt.running and self.clutchNow < 0.5
 end
 function PlayerDriver.prototype.onPress(self, id, ctx, speedLimit)
     local v = self.v
     local pt = v.pt
     local lights = v.lights
     repeat
-        local ____switch46 = id
-        local ____cond46 = ____switch46 == "shift_up"
-        if ____cond46 then
-            if pt.mode == "manual" and pt:shiftUp() then
+        local ____switch47 = id
+        local ____cond47 = ____switch47 == "shift_up"
+        if ____cond47 then
+            if self:grinds() then
+                ctx.events:emit({type = "grind", vehicle = v.id})
+            elseif pt.mode == "manual" and pt:shiftUp() then
                 ctx.events:emit({
                     type = "shift",
                     vehicle = v.id,
@@ -12123,9 +12130,11 @@ function PlayerDriver.prototype.onPress(self, id, ctx, speedLimit)
             end
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "shift_down"
-        if ____cond46 then
-            if pt.mode == "manual" and pt:shiftDown() then
+        ____cond47 = ____cond47 or ____switch47 == "shift_down"
+        if ____cond47 then
+            if self:grinds() then
+                ctx.events:emit({type = "grind", vehicle = v.id})
+            elseif pt.mode == "manual" and pt:shiftDown() then
                 ctx.events:emit({
                     type = "shift",
                     vehicle = v.id,
@@ -12136,22 +12145,22 @@ function PlayerDriver.prototype.onPress(self, id, ctx, speedLimit)
             end
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "gear_reverse"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "gear_reverse"
+        if ____cond47 then
             if math.abs(v.dyn.u) < 1.5 then
                 self.parked = false
                 pt:shiftTo(-1)
             end
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "gear_neutral"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "gear_neutral"
+        if ____cond47 then
             self.parked = false
             pt:shiftTo(0)
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "transmission_mode"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "transmission_mode"
+        if ____cond47 then
             pt.mode = pt.mode == "automatic" and "manual" or "automatic"
             self.parked = false
             if pt.mode == "automatic" and pt.gear == 0 then
@@ -12160,47 +12169,47 @@ function PlayerDriver.prototype.onPress(self, id, ctx, speedLimit)
             self:note(pt.mode == "manual" and "Manual transmission" or "Automatic transmission")
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "indicator_left"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "indicator_left"
+        if ____cond47 then
             lights:toggleIndicator("left")
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "indicator_right"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "indicator_right"
+        if ____cond47 then
             lights:toggleIndicator("right")
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "hazards"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "hazards"
+        if ____cond47 then
             lights.hazard = not lights.hazard
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "headlights"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "headlights"
+        if ____cond47 then
             lights:cycleHeadlights()
             self:note("Lights: " .. string.upper(lights.headlightSwitch))
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "high_beam"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "high_beam"
+        if ____cond47 then
             lights.highBeam = not lights.highBeam
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "wipers"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "wipers"
+        if ____cond47 then
             lights:cycleWipers()
             self:note("Wipers: " .. string.upper(lights.wipers))
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "siren"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "siren"
+        if ____cond47 then
             if v.spec.emergency then
                 lights:cycleSiren()
             end
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "cruise_toggle"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "cruise_toggle"
+        if ____cond47 then
             if self.cruise.on then
                 self.cruise.on = false
                 self:note("Cruise off")
@@ -12214,8 +12223,8 @@ function PlayerDriver.prototype.onPress(self, id, ctx, speedLimit)
             end
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "cruise_up"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "cruise_up"
+        if ____cond47 then
             if self.cruise.on then
                 local ____self_cruise_1, ____target_2 = self.cruise, "target"
                 ____self_cruise_1[____target_2] = ____self_cruise_1[____target_2] + 5 * KMH
@@ -12223,22 +12232,22 @@ function PlayerDriver.prototype.onPress(self, id, ctx, speedLimit)
             end
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "cruise_down"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "cruise_down"
+        if ____cond47 then
             if self.cruise.on then
                 self.cruise.target = math.max(15 * KMH, self.cruise.target - 5 * KMH)
                 self:note(("Cruise " .. tostring(math.floor(self.cruise.target * 3.6 + 0.5))) .. " km/h")
             end
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "limiter"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "limiter"
+        if ____cond47 then
             self.limiterOn = not self.limiterOn
             self:note(self.limiterOn and ("Limiter " .. tostring(math.floor(speedLimit * 3.6 + 0.5))) .. " km/h" or "Limiter off")
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "engine"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "engine"
+        if ____cond47 then
             if pt.running then
                 pt:stop()
                 ctx.events:emit({type = "engine", vehicle = v.id, on = false})
@@ -12249,37 +12258,37 @@ function PlayerDriver.prototype.onPress(self, id, ctx, speedLimit)
             end
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "seatbelt"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "seatbelt"
+        if ____cond47 then
             self.seatbelt = not self.seatbelt
             self:note(self.seatbelt and "Seatbelt fastened" or "Seatbelt unfastened")
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "toggle_abs"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "toggle_abs"
+        if ____cond47 then
             v.assists.abs = not v.assists.abs
             self:note("ABS " .. (v.assists.abs and "on" or "off"))
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "toggle_tcs"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "toggle_tcs"
+        if ____cond47 then
             v.assists.tcs = not v.assists.tcs
             self:note("Traction control " .. (v.assists.tcs and "on" or "off"))
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "toggle_esc"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "toggle_esc"
+        if ____cond47 then
             v.assists.esc = not v.assists.esc
             self:note("Stability control " .. (v.assists.esc and "on" or "off"))
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "apologize"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "apologize"
+        if ____cond47 then
             self.gesture = "wave"
             break
         end
-        ____cond46 = ____cond46 or ____switch46 == "rude_gesture"
-        if ____cond46 then
+        ____cond47 = ____cond47 or ____switch47 == "rude_gesture"
+        if ____cond47 then
             self.gesture = "rude"
             break
         end

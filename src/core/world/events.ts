@@ -27,6 +27,8 @@ export type SimEvent =
   | { type: "stall"; vehicle: number }
   | { type: "engine"; vehicle: number; on: boolean }
   | { type: "shift"; vehicle: number; gear: string }
+  | { type: "grind"; vehicle: number }
+  | { type: "chime"; vehicle: number; reason: string }
   | { type: "spawn"; vehicle: number }
   | { type: "despawn"; vehicle: number }
   | { type: "ped_speech"; ped: number; text: string; x: number; y: number }

@@ -269,7 +269,8 @@ export class InputMapper {
     const pressed: ActionId[] = [];
     const released: { id: ActionId; held: number }[] = [];
     const held: ActionId[] = [];
-    for (const id of this.pendingPress) if (pressed.indexOf(id) < 0) pressed.push(id);
+    // Keep repeats: two quick taps between frames are two presses.
+    for (const id of this.pendingPress) pressed.push(id);
     this.pendingPress = [];
     for (const a of ACTIONS) {
       const v = this.value(a.id);

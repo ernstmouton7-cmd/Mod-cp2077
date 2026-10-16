@@ -44,6 +44,8 @@ export class PlayerDriver {
   /** Notifications for the HUD (e.g. "Cruise set 60 km/h"). */
   readonly notes: string[] = [];
   private wasStalled = false;
+  /** Clutch pedal this frame (for "shift without clutch" grinding). */
+  private clutchNow = 0;
 
   constructor(readonly v: Vehicle) {}
 
@@ -68,6 +70,7 @@ export class PlayerDriver {
     const pt = v.pt;
     const lights = v.lights;
     this.gesture = undefined;
+    this.clutchNow = f.clutch;
     for (const id of f.pressed) this.onPress(id, ctx, speedLimit);
 
     // Horn & flash are "hold" actions.
@@ -183,8 +186,15 @@ export class PlayerDriver {
       if (this.seatbeltChime <= 0) {
         this.seatbeltChime = 6;
         this.note("Fasten seatbelt (B)");
+        ctx.events.emit({ type: "chime", vehicle: v.id, reason: "seatbelt" });
       }
     }
+  }
+
+  /** Manual box without clutch assist: shifting with the clutch out grinds and fails. */
+  private grinds(): boolean {
+    const pt = this.v.pt;
+    return pt.mode === "manual" && !this.settings.clutchAssist && pt.running && this.clutchNow < 0.5;
   }
 
   private onPress(id: ActionId, ctx: SimContext, speedLimit: number): void {
@@ -193,14 +203,16 @@ export class PlayerDriver {
     const lights = v.lights;
     switch (id) {
       case "shift_up":
-        if (pt.mode === "manual" && pt.shiftUp()) ctx.events.emit({ type: "shift", vehicle: v.id, gear: pt.gearLabel() });
+        if (this.grinds()) ctx.events.emit({ type: "grind", vehicle: v.id });
+        else if (pt.mode === "manual" && pt.shiftUp()) ctx.events.emit({ type: "shift", vehicle: v.id, gear: pt.gearLabel() });
         else if (pt.mode === "automatic" && pt.gear <= 0) {
           this.parked = false;
           pt.shiftTo(1);
         }
         break;
       case "shift_down":
-        if (pt.mode === "manual" && pt.shiftDown()) ctx.events.emit({ type: "shift", vehicle: v.id, gear: pt.gearLabel() });
+        if (this.grinds()) ctx.events.emit({ type: "grind", vehicle: v.id });
+        else if (pt.mode === "manual" && pt.shiftDown()) ctx.events.emit({ type: "shift", vehicle: v.id, gear: pt.gearLabel() });
         else if (pt.mode === "automatic" && Math.abs(v.dyn.u) < 0.5) this.parked = true;
         break;
       case "gear_reverse":
