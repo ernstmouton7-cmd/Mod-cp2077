@@ -1,0 +1,23 @@
+[package]
+name = "gridlock-app"
+description = "Gridlock native app: drive the simulated city with a gamepad"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "gridlock"
+path = "src/main.rs"
+
+[dependencies]
+gridlock-render = { path = "../render" }
+gridlock-game = { path = "../game" }
+gridlock-input = { path = "../input" }
+gridlock-assets = { path = "../assets", default-features = false }
+glam.workspace = true
+anyhow = "1"
+half = "2"
+winit = "0.30"
+egui = "0.37"
+egui-wgpu = "0.37"
+egui-winit = { version = "0.37", default-features = false, features = ["links", "wayland", "x11"] }

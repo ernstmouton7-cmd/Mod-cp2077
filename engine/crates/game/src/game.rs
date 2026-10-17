@@ -115,6 +115,12 @@ pub struct Game {
     pub last_rumble: Rumble,
     pub spray: SprayParticles,
     pub events: Vec<GameEvent>,
+    /// Events from every step of the last `update` (presentation layers read these).
+    pub frame_events: Vec<GameEvent>,
+    /// Controls from the last `update` (camera, pause and other host actions).
+    pub last_frame: ControlFrame,
+    /// Input events not yet consumed by a fixed step (frames faster than the step rate).
+    pending_input: Vec<gridlock_input::ActionEvent>,
     models: HashMap<PClass, CarModel>,
     action_ids: HashMap<&'static str, ActionId>,
     pub fixed_dt: f32,
@@ -193,6 +199,9 @@ impl Game {
             last_rumble: Rumble::default(),
             spray: SprayParticles::new(4000),
             events: Vec::new(),
+            frame_events: Vec::new(),
+            last_frame: ControlFrame::default(),
+            pending_input: Vec::new(),
             models: HashMap::new(),
             action_ids,
             fixed_dt: 1.0 / 60.0,
@@ -241,10 +250,15 @@ impl Game {
             .map_or(0.0, |v| v.telemetry.speed);
         let frame = self.input.update(real_dt as f32, pad, kb, speed);
         let mut first = true;
+        self.frame_events.clear();
+        self.pending_input.extend(frame.events.iter().copied());
         while self.accumulator >= self.fixed_dt as f64 {
             self.accumulator -= self.fixed_dt as f64;
             let f = if first {
-                frame.clone()
+                ControlFrame {
+                    events: std::mem::take(&mut self.pending_input),
+                    ..frame.clone()
+                }
             } else {
                 ControlFrame {
                     events: Vec::new(),
@@ -253,8 +267,10 @@ impl Game {
             };
             first = false;
             self.step(&f);
+            self.frame_events.extend(self.events.iter().cloned());
             steps += 1;
         }
+        self.last_frame = frame;
         steps
     }
 
