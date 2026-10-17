@@ -6,8 +6,8 @@
 //! call that returns a mesh or until `gl_game_update`.
 //!
 //! With `GlConfig::coords = GL_COORDS_UNREAL` every position is converted to Unreal units and
-//! axes (centimetres, left-handed, Z up: X = east, Y = south, Z = up), rotations accordingly,
-//! and mesh triangle winding is flipped to stay front-facing. See `include/gridlock.h`.
+//! axes (centimetres, left-handed, Z up: X = east, Y = south, Z = up) and rotations accordingly.
+//! Mesh triangles are always counter-clockwise when seen from outside. See `include/gridlock.h`.
 
 #![allow(clippy::missing_safety_doc)]
 
@@ -311,13 +311,8 @@ impl GlGame {
         for uv in &m.uvs {
             self.mesh_uv.extend_from_slice(&[uv.x, uv.y]);
         }
-        for t in m.indices.chunks_exact(3) {
-            if self.unreal {
-                self.mesh_idx.extend_from_slice(&[t[0], t[2], t[1]]);
-            } else {
-                self.mesh_idx.extend_from_slice(t);
-            }
-        }
+        // Winding is unchanged: triangles are counter-clockwise seen from outside, physically.
+        self.mesh_idx.extend_from_slice(&m.indices);
         *out = GlMesh {
             positions: self.mesh_pos.as_ptr(),
             normals: self.mesh_nrm.as_ptr(),
@@ -863,6 +858,25 @@ pub unsafe extern "C" fn gl_car_damaged_mesh(
     rev.max(1)
 }
 
+/// Pose of car mesh `mesh` (1-based part index as in `gl_car_model_mesh`). Returns 1 when the part
+/// has come loose or off and must be drawn at `out` instead of with the car, 0 otherwise.
+#[no_mangle]
+pub unsafe extern "C" fn gl_car_part_pose(g: *mut GlGame, car_id: u32, mesh: u32, out: *mut GlPose) -> u32 {
+    let (Some(g), Some(out)) = (g.as_mut(), out.as_mut()) else { return 0 };
+    if mesh == 0 {
+        return 0;
+    }
+    let Some(dmg) = g.game.damage_of(VehicleId(car_id)) else { return 0 };
+    let pi = (mesh - 1) as usize;
+    let Some(part) = dmg.parts.get(pi) else { return 0 };
+    if part.body.is_none() {
+        return 0;
+    }
+    let Some(pose) = dmg.part_pose(&g.game.physics, pi) else { return 0 };
+    *out = g.pose(&pose);
+    1
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn gl_city_buildings(g: *mut GlGame, out: *mut GlBuilding, cap: u32) -> u32 {
     let Some(g) = g.as_mut() else { return 0 };
@@ -1105,5 +1119,47 @@ mod tests {
             (r2 - Vec3::from(rotated)).length() < 1e-4,
             "{r2:?} vs {rotated:?}"
         );
+    }
+}
+
+#[cfg(test)]
+mod abi {
+    use super::*;
+    use std::mem::{align_of, size_of};
+
+    /// Compile a C file that static-asserts every struct size/alignment against Rust's layout.
+    #[test]
+    fn header_matches_rust_layout() {
+        let checks = [
+            ("GlConfig", size_of::<GlConfig>(), align_of::<GlConfig>()),
+            ("GlPad", size_of::<GlPad>(), align_of::<GlPad>()),
+            ("GlPose", size_of::<GlPose>(), align_of::<GlPose>()),
+            ("GlCarView", size_of::<GlCarView>(), align_of::<GlCarView>()),
+            ("GlSignalView", size_of::<GlSignalView>(), align_of::<GlSignalView>()),
+            ("GlPedView", size_of::<GlPedView>(), align_of::<GlPedView>()),
+            ("GlPropView", size_of::<GlPropView>(), align_of::<GlPropView>()),
+            ("GlEnv", size_of::<GlEnv>(), align_of::<GlEnv>()),
+            ("GlRumble", size_of::<GlRumble>(), align_of::<GlRumble>()),
+            ("GlHud", size_of::<GlHud>(), align_of::<GlHud>()),
+            ("GlEvent", size_of::<GlEvent>(), align_of::<GlEvent>()),
+            ("GlMesh", size_of::<GlMesh>(), align_of::<GlMesh>()),
+            ("GlBuilding", size_of::<GlBuilding>(), align_of::<GlBuilding>()),
+            ("GlBlock", size_of::<GlBlock>(), align_of::<GlBlock>()),
+            ("GlMarking", size_of::<GlMarking>(), align_of::<GlMarking>()),
+        ];
+        let dir = std::env::temp_dir().join(format!("gridlock_abi_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut c = String::from("#include \"gridlock.h\"\n#include <stdalign.h>\n");
+        for (name, size, align) in checks {
+            c += &format!("_Static_assert(sizeof({name}) == {size}, \"{name} size\");\n_Static_assert(alignof({name}) == {align}, \"{name} align\");\n");
+        }
+        let file = dir.join("abi.c");
+        std::fs::write(&file, c).unwrap();
+        let include = concat!(env!("CARGO_MANIFEST_DIR"), "/include");
+        let Ok(out) = std::process::Command::new("cc").args(["-std=c11", "-fsyntax-only", "-I", include]).arg(&file).output() else {
+            eprintln!("no C compiler; skipping");
+            return;
+        };
+        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     }
 }
