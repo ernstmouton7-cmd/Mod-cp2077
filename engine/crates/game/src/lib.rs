@@ -9,11 +9,13 @@ pub mod carmesh;
 pub mod city;
 pub mod coords;
 pub mod game;
+pub mod hud;
 pub mod scene;
 
 pub use carmesh::{build_car, CarModel, CarPart, MeshData, Paint};
 pub use city::{BuildingGeom, BuildingStyle, MarkKind, Marking, StaticCity};
 pub use game::{CarLink, CarState, Game, GameConfig, GameEvent};
+pub use hud::HudInfo;
 pub use scene::{CarView, EnvironmentView, LampState, PedView, PropView, SceneFrame, SignalView};
 
 pub use gridlock_input as input;

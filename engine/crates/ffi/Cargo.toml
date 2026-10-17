@@ -1,0 +1,13 @@
+[package]
+name = "gridlock-ffi"
+description = "C ABI for the Gridlock engine (Unreal Engine 5 plugin and other hosts)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "gridlock_ffi"
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+gridlock-game = { path = "../game" }

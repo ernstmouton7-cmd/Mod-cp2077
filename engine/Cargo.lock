@@ -521,6 +521,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "gridlock-ffi"
+version = "0.2.0"
+dependencies = [
+ "gridlock-game",
+]
+
+[[package]]
 name = "gridlock-game"
 version = "0.2.0"
 dependencies = [
